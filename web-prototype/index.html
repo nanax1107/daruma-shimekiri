@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>だるまさんが締め切った（試作版）</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0d14;color:#fff;
+    font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;user-select:none}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+  .hud{position:fixed;pointer-events:none}
+  .hidden{display:none !important}
+  #top{top:12px;left:50%;transform:translateX(-50%);width:min(520px,60vw);text-align:center}
+  #hpLabel{font-size:13px;margin-bottom:4px;text-shadow:0 1px 3px #000}
+  #hpBar{height:14px;background:#2a1214;border:1px solid #a33;border-radius:7px;overflow:hidden}
+  #hpFill{height:100%;width:100%;background:linear-gradient(90deg,#e33,#f84);transition:width .3s}
+  #status{top:12px;left:12px;font-size:13px;line-height:1.75;background:rgba(0,0,0,.5);padding:8px 12px;border-radius:8px}
+  #status b{color:#ffd36b}
+  #danger{color:#ff6b6b;font-weight:700}
+  #msg{top:60%;left:50%;transform:translate(-50%,-50%);font-size:clamp(24px,4.2vw,46px);font-weight:800;
+    text-shadow:0 2px 10px #000,0 0 2px #000;text-align:center;white-space:pre-line}
+  #hint{bottom:92px;left:50%;transform:translateX(-50%);font-size:14px;background:rgba(0,0,0,.55);
+    padding:5px 14px;border-radius:6px;white-space:nowrap}
+  #hint.win{background:#b8860b;color:#fff;font-weight:800;font-size:16px}
+  #handWrap{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:4px;align-items:flex-end}
+  .tile{width:40px;height:56px;background:#f5f1e6;border-radius:5px;border:2px solid #cfc6b0;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;font-weight:800;cursor:pointer;
+    box-shadow:0 3px 0 #9c9484;transition:transform .08s}
+  .tile .n{font-size:22px;line-height:1}
+  .tile .s{font-size:13px;line-height:1.15}
+  .tile.sel{transform:translateY(-10px);border-color:#ffcc33;box-shadow:0 3px 0 #9c9484,0 0 0 3px #ffcc33}
+  .tile.tsumo{margin-left:16px}
+  .tile.dora{background:#fff1bf;border-color:#e0a800}
+  .tile.dora::after{content:'ドラ';font-size:9px;color:#a86b00;line-height:1}
+  .tile.empty{background:transparent;border:2px dashed rgba(255,255,255,.35);box-shadow:none;cursor:default}
+  .c0{color:#c62828}.c1{color:#1a56c4}.c2{color:#1b7f3b}
+  #vignette{inset:0;transition:box-shadow .25s}
+  #vignette.look{box-shadow:inset 0 0 140px 40px rgba(255,0,0,.5)}
+  #vignette.warn{box-shadow:inset 0 0 110px 20px rgba(255,190,0,.35)}
+  #crosshair{top:50%;left:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.7)}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,12,.84);z-index:10;padding:16px;box-sizing:border-box}
+  .panel{max-width:600px;max-height:100%;overflow:auto;padding:26px 30px;background:#161a26;border:1px solid #2f3756;border-radius:14px;line-height:1.7;box-sizing:border-box}
+  .panel h1{font-size:28px;margin:0 0 4px}
+  .panel .tag{display:inline-block;font-size:12px;background:#333b5c;padding:1px 8px;border-radius:10px;margin-bottom:10px}
+  .panel p{margin:6px 0}
+  .panel table{border-collapse:collapse;margin:10px 0;font-size:14px;width:100%}
+  .panel td{padding:3px 8px;border-bottom:1px solid #262c44}
+  .panel td:first-child{color:#ffd36b;white-space:nowrap;width:150px}
+  .btn{display:inline-block;margin-top:14px;padding:10px 28px;font-size:17px;font-weight:800;color:#fff;background:#d33;
+    border:none;border-radius:8px;cursor:pointer;font-family:inherit}
+  .btn:hover{background:#e44}
+  #resultTitle{font-size:34px;margin:0 0 6px}
+  #stateBox{top:58px;left:50%;transform:translateX(-50%);width:min(520px,60vw);text-align:center}
+  #stateText{font-size:15px;font-weight:800;text-shadow:0 1px 4px #000;margin-bottom:4px}
+  #stateBar{height:8px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden}
+  #stateFill{height:100%;width:0;background:#4caf50}
+  #msg.look{animation:pulse .5s ease-in-out infinite alternate}
+  @keyframes pulse{from{transform:translate(-50%,-50%) scale(1)}to{transform:translate(-50%,-50%) scale(1.08)}}
+  .modes{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .mode{flex:1 1 150px;text-align:left;padding:14px 16px;border-radius:10px;border:2px solid #2f3756;background:#1e2436;
+    color:#fff;cursor:pointer;font-family:inherit;line-height:1.5}
+  .mode:hover{border-color:#ffd36b;background:#262d44}
+  .mode b{font-size:16px;display:block;white-space:nowrap}
+  .mode .lv{display:inline-block;font-size:12px;padding:0 8px;border-radius:9px;margin:2px 0 4px;font-weight:700}
+  .lv.easy{background:#2e7d32}.lv.normal{background:#c77700}.lv.hard{background:#b71c1c}.lv.tut{background:#1565c0}
+  .mode.tutorial{flex-basis:100%;border-color:#1e5aa8}
+  #tutBox{top:186px;left:12px;width:300px;background:rgba(10,30,70,.82);border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;
+    font-size:14px;line-height:1.65}
+  #tutStep{font-size:12px;color:#9cc3ff;font-weight:700;margin-bottom:2px}
+  #tutBox.done{border-color:#ffd36b}
+  .mode small{display:block;color:#b8c0d8;font-size:12.5px}
+  .btn.sub{background:#3a4366;margin-left:8px}
+  .btn.sub:hover{background:#4a5580}
+  #err{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="vignette" class="hud"></div>
+<div id="crosshair" class="hud"></div>
+<div id="top" class="hud">
+  <div id="hpLabel">教授ダルマ HP 8 / 8</div>
+  <div id="hpBar"><div id="hpFill"></div></div>
+</div>
+<div id="stateBox" class="hud">
+  <div id="stateText"></div>
+  <div id="stateBar"><div id="stateFill"></div></div>
+</div>
+<div id="status" class="hud"></div>
+<div id="msg" class="hud"></div>
+<div id="tutBox" class="hud hidden"><div id="tutStep"></div><div id="tutText"></div></div>
+<div id="hint" class="hud"></div>
+<div id="handWrap"></div>
+
+<div id="title" class="overlay">
+  <div class="panel">
+    <h1>だるまさんが締め切った</h1>
+    <span class="tag">試作版</span>
+    <p>締め切り前夜の大学。欲しい牌の上に立って待とう。ダルマが振り向いた瞬間、足元の牌がツモになる。麻雀の役を作って倒そう。
+      振り向いている間に動くと見つかって、後ろから<b>締め切りの壁</b>が迫ってくる。</p>
+    <div class="modes">
+      <button class="mode tutorial" data-mode="tut"><b>チュートリアル</b><span class="lv tut">はじめての人</span>
+        <small>画面の指示に沿って、移動・ツモ・捨て牌・もういいや・上がりを1つずつ練習。壁は動かないので負けない。</small></button>
+      <button class="mode" data-mode="gakka"><b>学科分けモード</b><span class="lv easy">やさしい</span>
+        <small>GPAダルマ。振り向き8秒・壁はゆっくり・HP3。まずはここから。</small></button>
+      <button class="mode" data-mode="zemi"><b>ゼミ分けモード</b><span class="lv normal">ふつう</span>
+        <small>教授ダルマ。振り向き6秒・壁が速い・HP5。振り向くふりのフェイントあり。</small></button>
+      <button class="mode" data-mode="lab"><b>研究室分けモード</b><span class="lv hard">むずかしい</span>
+        <small>ボスダルマ。振り向き5秒・壁がとても速い・HP6・もういいや1回。フェイントに加えて、振り向き直しもある。</small></button>
+    </div>
+    <p style="margin-top:16px;font-weight:700">操作</p>
+    <table>
+      <tr><td>WASD</td><td>移動（振り向き中は止まる！）</td></tr>
+      <tr><td>マウス / ← →</td><td>視点移動（マウスが使えない時は ← → キーかドラッグ）</td></tr>
+      <tr><td>牌の上で待つ</td><td>ダルマが振り向いた時に足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
+      <tr><td>E / 右クリック長押し</td><td>ズーム（奥の牌を確認）</td></tr>
+      <tr><td>ホイール / Z・X</td><td>捨てる牌を選ぶ</td></tr>
+      <tr><td>左クリック / F</td><td>選んだ牌を捨てる（牌を直接クリックでも可）</td></tr>
+      <tr><td>Space</td><td>上がり → ダルマに攻撃（翻数＝ダメージ）</td></tr>
+      <tr><td>Q</td><td>もういいや：手牌を配り直す（回数制限あり・壁が迫る）</td></tr>
+    </table>
+    <p style="font-size:13px;color:#aab">役：ツモ1／タンヤオ1／七対子2／対々和2／清一色6。ドラ1枚につき＋1翻。上がりの形は4面子1雀頭か七対子。字牌はなし。<br>上がると締め切りの壁が後退する。</p>
+  </div>
+</div>
+
+<div id="result" class="overlay hidden">
+  <div class="panel" style="text-align:center">
+    <div id="resultTitle"></div>
+    <p id="resultText"></p>
+    <button class="btn" id="retryBtn">もう一度</button><button class="btn sub" id="menuBtn">モード選択へ</button>
+  </div>
+</div>
+
+<div id="err" class="hidden"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+if (typeof THREE === 'undefined') {
+  const e = document.getElementById('err');
+  e.classList.remove('hidden');
+  e.textContent = '3D描画ライブラリを読み込めませんでした。ページを再読み込みしてください。';
+  return;
+}
+
+// ===== 調整パラメータ（仕様書 14 章） =====
+const P = {
+  hp: 3, backMin: 3, backMax: 6, warn: 2, look: 8,
+  detectSpeed: 0.3, grace: 0.4,
+  wallSpeed: 0.05, wallPenalty: 2, wallStart: 6, wallPushback: 4,
+  moiiya: 3, swapRate: 0.3, feint: 0, quick: 0,
+  cols: 6, rows: 20, tileSize: 1.5, tileCd: 2,
+  moveSpeed: 3.2
+};
+// ===== モード =====
+const MODES = {
+  gakka: {
+    name: '学科分けモード', daruma: 'GPAダルマ', face: 'GPA', color: 0xc8202a,
+    warnText: '成績…どう…', lookText: 'GPA足りてる？',
+    params: {hp: 3, backMin: 3, backMax: 6, warn: 2, look: 8, detectSpeed: 0.3,
+      wallSpeed: 0.05, wallPenalty: 2, wallPushback: 4, moiiya: 3, swapRate: 0.3, feint: 0}
+  },
+  zemi: {
+    name: 'ゼミ分けモード', daruma: '教授ダルマ', face: '教授', color: 0x6b2fb3,
+    warnText: '志望理由…は…', lookText: '志望理由を言ってみて！',
+    params: {hp: 5, backMin: 2.5, backMax: 5, warn: 1.5, look: 6, detectSpeed: 0.25,
+      wallSpeed: 0.08, wallPenalty: 3, wallPushback: 3, moiiya: 2, swapRate: 0.4, feint: 0.25}
+  },
+  lab: {
+    name: '研究室分けモード', daruma: 'ボスダルマ', face: 'ボス', color: 0x1f1f24,
+    warnText: '進捗…どう…', lookText: '進捗どうですか！',
+    params: {hp: 6, backMin: 2, backMax: 4, warn: 1.2, look: 5, detectSpeed: 0.2,
+      wallSpeed: 0.11, wallPenalty: 3, wallPushback: 3, moiiya: 1, swapRate: 0.5, feint: 0.3, quick: 0.25}
+  },
+  tut: {
+    name: 'チュートリアル', daruma: '練習ダルマ', face: '練習', color: 0xe07b00, tutorial: true,
+    warnText: 'だるまさんが…', lookText: '振り向いたよ！ 止まって！',
+    params: {hp: 1, backMin: 4, backMax: 6, warn: 2.5, look: 8, detectSpeed: 0.3,
+      wallSpeed: 0, wallPenalty: 0, wallPushback: 0, moiiya: 99, swapRate: 0.3, feint: 0}
+  }
+};
+let MODE = MODES.gakka;
+
+// ===== 牌 =====
+const SUITS = ['萬', '筒', '索'];
+const SUIT_COLORS = ['#c62828', '#1a56c4', '#1b7f3b'];
+const randTile = () => Math.floor(Math.random() * 27);
+const num = t => t % 9 + 1;
+const suit = t => Math.floor(t / 9);
+const dealHand = () => Array.from({length: 13}, randTile).sort((a, b) => a - b);
+
+// ===== 上がり判定・役判定（仕様書 4・5 章） =====
+function canMentsu(c, i, allowSeq) {
+  while (i < 34 && c[i] === 0) i++;
+  if (i === 34) return true;
+  if (c[i] >= 3) {
+    c[i] -= 3; const ok = canMentsu(c, i, allowSeq); c[i] += 3;
+    if (ok) return true;
+  }
+  if (allowSeq && i < 27 && i % 9 <= 6 && c[i + 1] > 0 && c[i + 2] > 0) {
+    c[i]--; c[i + 1]--; c[i + 2]--;
+    const ok = canMentsu(c, i, allowSeq);
+    c[i]++; c[i + 1]++; c[i + 2]++;
+    if (ok) return true;
+  }
+  return false;
+}
+function isStandard(c, allowSeq) {
+  for (let i = 0; i < 34; i++) {
+    if (c[i] < 2) continue;
+    c[i] -= 2; const ok = canMentsu(c, 0, allowSeq); c[i] += 2;
+    if (ok) return true;
+  }
+  return false;
+}
+function isChiitoi(c) {
+  let pairs = 0;
+  for (let i = 0; i < 34; i++) {
+    if (c[i] === 2) pairs++;
+    else if (c[i] !== 0) return false;
+  }
+  return pairs === 7;
+}
+function evaluate(tiles) {
+  const c = new Array(34).fill(0);
+  tiles.forEach(t => c[t]++);
+  const std = isStandard(c, true), chi = isChiitoi(c);
+  if (!std && !chi) return null;
+  const tanyao = tiles.every(t => t % 9 >= 1 && t % 9 <= 7);
+  const chinitsu = tiles.every(t => suit(t) === suit(tiles[0]));
+  const base = [['ツモ', 1]];
+  if (tanyao) base.push(['タンヤオ', 1]);
+  if (chinitsu) base.push(['清一色', 6]);
+  let best = null;
+  const consider = list => {
+    const han = list.reduce((a, y) => a + y[1], 0);
+    if (!best || han > best.han) best = {han, yaku: list};
+  };
+  if (std) { const l = base.slice(); if (isStandard(c, false)) l.push(['対々和', 2]); consider(l); }
+  if (chi) consider(base.concat([['七対子', 2]]));
+  return best;
+}
+
+// ===== 描画の準備 =====
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d14);
+scene.fog = new THREE.Fog(0x0b0d14, 14, 55);
+const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 120);
+camera.rotation.order = 'YXZ';
+scene.add(new THREE.HemisphereLight(0xc8d6ff, 0x1a1a28, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.55);
+sun.position.set(3, 10, 4);
+scene.add(sun);
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 牌のテクスチャ（27種）
+function tileTexture(t) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f5f1e6'; g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = '#c9bfa6'; g.lineWidth = 6; g.strokeRect(3, 3, 122, 122);
+  g.fillStyle = SUIT_COLORS[suit(t)];
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = 'bold 64px sans-serif'; g.fillText(String(num(t)), 64, 46);
+  g.font = 'bold 40px sans-serif'; g.fillText(SUITS[suit(t)], 64, 100);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  return tex;
+}
+const TEX = Array.from({length: 27}, (_, t) => tileTexture(t));
+
+// 床・壁・机
+const S = P.tileSize, halfW = P.cols * S / 2, floorLen = P.rows * S;
+// 床の傾斜：z<0（牌のある範囲）は奥に向かって上り坂。ゲーム内の座標は「床に沿った距離」で持ち、描画時に変換する
+const EYE = 2.3;                          // 目の高さ（高めにして奥を見下ろしやすく）
+const SLOPE = 0.28, TH = Math.atan(SLOPE), COS = Math.cos(TH), SIN = Math.sin(TH);
+const toY = s => s < 0 ? -s * SIN : 0;
+const toZ = s => s < 0 ? s * COS : s;
+const track = new THREE.Group();          // 傾いた床。中の物は床に沿った座標で置ける
+track.rotation.x = TH;
+scene.add(track);
+const baseMat = new THREE.MeshLambertMaterial({color: 0x232838});
+const baseFlat = new THREE.Mesh(new THREE.PlaneGeometry(14, 12), baseMat);
+baseFlat.rotation.x = -Math.PI / 2; baseFlat.position.set(0, 0, 6);
+scene.add(baseFlat);
+const baseSlope = new THREE.Mesh(new THREE.PlaneGeometry(14, 46), baseMat);
+baseSlope.rotation.x = -Math.PI / 2; baseSlope.position.set(0, 0, -23);
+track.add(baseSlope);
+const sideMat = new THREE.MeshLambertMaterial({color: 0x2b3150});
+[-1, 1].forEach(sx => {
+  const wf = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4, 12), sideMat);
+  wf.position.set(sx * (halfW + 1.3), 2, 6);
+  scene.add(wf);
+  const ws = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4, 46), sideMat);
+  ws.position.set(sx * (halfW + 1.3), 2, -23);
+  track.add(ws);
+});
+const deskMat = new THREE.MeshLambertMaterial({color: 0x6b5338});
+const monMat = new THREE.MeshLambertMaterial({color: 0x111111, emissive: 0x1b3a66});
+for (let i = 0; i < 6; i++) {
+  [-1, 1].forEach(sx => {
+    const z = -2 - i * 5 - (sx > 0 ? 2.5 : 0);
+    const d = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.75, 1.6), deskMat);
+    d.position.set(sx * (halfW + 0.65), toY(z) + 0.375, toZ(z));
+    scene.add(d);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, 0.7), monMat);
+    m.position.set(sx * (halfW + 0.85), toY(z) + 1.0, toZ(z));
+    scene.add(m);
+  });
+}
+
+// 床の牌（6列×20行）
+const tileGeo = new THREE.BoxGeometry(S * 0.93, 0.12, S * 0.93);
+const tileSideMat = new THREE.MeshLambertMaterial({color: 0xd6ccb4});
+const tiles = [];
+for (let r = 0; r < P.rows; r++) {
+  for (let c = 0; c < P.cols; c++) {
+    const top = new THREE.MeshLambertMaterial({map: TEX[0], emissive: 0x000000});
+    const mesh = new THREE.Mesh(tileGeo, [tileSideMat, tileSideMat, top, tileSideMat, tileSideMat, tileSideMat]);
+    mesh.position.set(-halfW + S * (c + 0.5), 0.06, -S * (r + 0.5));
+    track.add(mesh);
+    tiles.push({mesh, top, type: 0, cdUntil: 0, flashUntil: 0});
+  }
+}
+function setTile(tl, type) { tl.type = type; tl.top.map = TEX[type]; tl.top.needsUpdate = true; }
+
+// 教授ダルマ
+const daruma = new THREE.Group();
+daruma.position.set(0, toY(-floorLen - 5), toZ(-floorLen - 5));
+const body = new THREE.Mesh(new THREE.SphereGeometry(2.4, 32, 24), new THREE.MeshLambertMaterial({color: 0xc8202a}));
+body.position.y = 2.4; body.scale.y = 1.08;
+daruma.add(body);
+function makeFace(label) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f7ead8';
+  g.beginPath(); g.ellipse(128, 112, 92, 78, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#222'; g.lineWidth = 7;
+  g.beginPath(); g.arc(88, 100, 26, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.arc(168, 100, 26, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(114, 100); g.lineTo(142, 100); g.stroke();
+  g.fillStyle = '#111';
+  g.beginPath(); g.arc(88, 102, 9, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(168, 102, 9, 0, Math.PI * 2); g.fill();
+  g.lineWidth = 9;
+  g.beginPath(); g.moveTo(60, 62); g.lineTo(110, 72); g.stroke();
+  g.beginPath(); g.moveTo(196, 62); g.lineTo(146, 72); g.stroke();
+  g.lineWidth = 6;
+  g.beginPath(); g.moveTo(100, 150); g.quadraticCurveTo(128, 138, 156, 150); g.stroke();
+  g.fillStyle = '#ffd36b'; g.font = 'bold 44px sans-serif'; g.textAlign = 'center';
+  g.fillText(label, 128, 236);
+  return new THREE.CanvasTexture(cv);
+}
+const FACES = {gakka: makeFace('GPA'), zemi: makeFace('教授'), lab: makeFace('ボス'), tut: makeFace('練習')};
+const faceMat = new THREE.MeshBasicMaterial({map: FACES.gakka, transparent: true});
+const face = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), faceMat);
+face.position.set(0, 2.7, 2.35);
+daruma.add(face);
+function applyMode(key) {
+  MODE = MODES[key];
+  Object.assign(P, {feint: 0, quick: 0}, MODE.params);
+  faceMat.map = FACES[key]; faceMat.needsUpdate = true;
+  body.material.color.setHex(MODE.color);
+}
+// 振り向き中に光る目と赤いライト
+const eyeMat = new THREE.MeshBasicMaterial({color: 0xff2020});
+const eyes = [-0.47, 0.47].map(x => {
+  const e = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), eyeMat);
+  e.position.set(x, 3.0, 2.42);
+  e.visible = false;
+  daruma.add(e);
+  return e;
+});
+const glare = new THREE.PointLight(0xff2a2a, 0, 45, 1.2);
+glare.position.set(0, 3, 3.5);
+daruma.add(glare);
+scene.add(daruma);
+const FOG_NORMAL = new THREE.Color(0x0b0d14), FOG_LOOK = new THREE.Color(0x2c0609), FOG_WARN = new THREE.Color(0x1f1806);
+
+// 締め切りの壁
+const wallMat = (function () {
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 256;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#9c0f17'; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = '#fff'; g.font = 'bold 150px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('締切', 256, 132);
+  return new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0.9});
+})();
+const wallSide = new THREE.MeshBasicMaterial({color: 0x7a0a10});
+const wall = new THREE.Mesh(new THREE.BoxGeometry(halfW * 2 + 2.6, 6, 0.3),
+  [wallSide, wallSide, wallSide, wallSide, wallSide, wallMat]);
+scene.add(wall);
+
+// ===== ゲーム状態 =====
+const $ = id => document.getElementById(id);
+const G = {};
+let running = false;
+function reset() {
+  G.hp = P.hp;
+  G.hand = dealHand(); G.drawn = null; G.sel = 0; G.win = null;
+  G.moiiya = P.moiiya; G.found = 0;
+  G.wallZ = P.wallStart;
+  rollDora();
+  G.px = 0; G.pz = 1.8; G.yaw = 0; G.pitch = -0.12;
+  G.cell = -1;
+  G.state = 'back'; G.stateT = 0; G.stateDur = 4; G.foundThisLook = false;
+  G.time = 0; G.msg = ''; G.msgColor = '#fff'; G.msgUntil = 0;
+  G.shakeUntil = 0; G.quickNext = false;
+  G.tut = 0; G.moved = 0; G.turned = 0; G.lastYaw = 0;
+  daruma.rotation.y = Math.PI;
+  tiles.forEach(tl => { setTile(tl, randTile()); tl.cdUntil = 0; tl.flashUntil = 0; });
+  renderHand(); updateHud();
+}
+
+function flash(text, color, dur) { G.msg = text; G.msgColor = color || '#fff'; G.msgUntil = G.time + (dur || 1.6); }
+
+// ===== 手牌 =====
+function fullHand() { return G.drawn === null ? G.hand : G.hand.concat([G.drawn]); }
+function maxSel() { return G.drawn === null ? 12 : 13; }
+// ドラ：表示牌の次の数字（9の次は1）
+function rollDora() { G.doraInd = randTile(); G.dora = suit(G.doraInd) * 9 + (G.doraInd % 9 + 1) % 9; }
+function withDora(r, list) {
+  if (!r) return r;
+  const n = list.filter(t => t === G.dora).length;
+  if (n > 0) { r.yaku = r.yaku.concat([['ドラ' + n, n]]); r.han += n; }
+  return r;
+}
+function checkWin() { G.win = G.drawn === null ? null : withDora(evaluate(fullHand()), fullHand()); }
+function tsumo(type) { G.drawn = type; G.sel = 13; checkWin(); renderHand(); }
+function discard(i) {
+  if (!running || G.drawn === null) return;
+  if (i === undefined) i = G.sel;
+  if (i === 13) { G.drawn = null; }
+  else { G.hand.splice(i, 1); G.hand.push(G.drawn); G.hand.sort((a, b) => a - b); G.drawn = null; }
+  G.sel = Math.min(G.sel, 12); G.win = null;
+  renderHand();
+  tutEvent('discard');
+}
+function declareWin() {
+  if (!running || !G.win) return;
+  const r = G.win;
+  G.hp = Math.max(0, G.hp - r.han);
+  G.shakeUntil = G.time + 0.6;
+  const before = G.wallZ;
+  G.wallZ = Math.min(P.wallStart, G.wallZ + P.wallPushback);
+  const back = G.wallZ - before;
+  rollDora();
+  flash(r.yaku.map(y => y[0]).join('・') + '\n' + r.han + '翻 ダメージ！' +
+    (back > 0.05 ? '\n締め切りが' + back.toFixed(1) + 'm後退！' : '') + '\nドラが変わった', '#ffd36b', 2.8);
+  G.hand = dealHand(); G.drawn = null; G.sel = 0; G.win = null;
+  renderHand(); updateHud();
+  tutEvent('win');
+  if (G.hp <= 0) end(true);
+}
+function moiiya() {
+  if (!running) return;
+  if (G.drawn !== null) { flash('先に1枚捨ててから', '#ccc', 1.2); return; }
+  if (G.moiiya <= 0) { flash('もう使えない…', '#ccc', 1.2); return; }
+  G.moiiya--; G.hand = dealHand(); G.sel = 0;
+  G.wallZ -= P.wallPenalty;
+  flash(P.wallPenalty > 0 ? 'もういいや…\n締め切りが' + P.wallPenalty + 'm迫る' : 'もういいや…\n手牌を配り直した', '#ff8a8a', 1.8);
+  renderHand();
+  tutEvent('moiiya');
+}
+// ===== チュートリアル =====
+const TUT = [
+  {ev: 'move', text: 'WASD で歩いてみよう。'},
+  {ev: 'turn', text: 'マウス（使えないときは ← → キーかドラッグ）で、まわりを見渡してみよう。'},
+  {ev: 'tsumo', text: '上の状態バーが緑の間は動ける。好きな牌の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌がツモになる。'},
+  {ev: 'discard', text: 'ツモできた！ 振り向き中は動かずに、ホイールか Z・X で捨てる牌を選び、左クリックか F で1枚捨てよう（牌を直接クリックしてもOK）。'},
+  {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
+  {ev: 'moiiya', text: '手が悪いときは Q で「もういいや」。手牌を全部配り直せる（本番は回数制限あり・壁が迫る）。押してみよう。'},
+  {ev: 'win', setup: true, text: '最後は上がりの練習。あと1枚で上がれる手を用意した。緑色に光っている 4萬 か 7萬 の上に立って振り向きを待ち、ツモったら Space で攻撃！'}
+];
+const TUT_WIN = [3, 6];
+function tutSeed() {
+  // 自分の近くの牌を 4萬・7萬 にする
+  let k = 0;
+  tiles.forEach((tl, i) => {
+    const r = Math.floor(i / P.cols), pr = Math.floor(-G.pz / S);
+    if (Math.abs(r - Math.max(0, pr)) <= 1 && i !== G.cell) setTile(tl, TUT_WIN[(k++) % 2]);
+  });
+}
+function tutShow() {
+  const box = $('tutBox');
+  if (!MODE.tutorial) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const st = TUT[G.tut];
+  $('tutStep').textContent = 'チュートリアル ' + (G.tut + 1) + ' / ' + TUT.length;
+  $('tutText').textContent = st.text;
+}
+function tutEvent(ev) {
+  if (!MODE.tutorial || G.tut >= TUT.length || TUT[G.tut].ev !== ev) return;
+  G.tut++;
+  if (G.tut >= TUT.length) return;
+  if (TUT[G.tut].setup) {
+    G.drawn = null; G.sel = 0;
+    G.hand = [1, 2, 3, 4, 5, 10, 11, 12, 13, 13, 19, 20, 21];   // 4萬・7萬 待ち
+    renderHand(); tutSeed();
+  }
+  flash('OK！', '#9cc3ff', 0.9);
+  tutShow();
+}
+function tileHtml(t, cls, i) {
+  return '<div class="tile ' + cls + '" data-i="' + i + '"><span class="n c' + suit(t) + '">' + num(t) +
+    '</span><span class="s c' + suit(t) + '">' + SUITS[suit(t)] + '</span></div>';
+}
+function renderHand() {
+  let h = '';
+  G.hand.forEach((t, i) => { h += tileHtml(t, (i === G.sel ? 'sel' : '') + (t === G.dora ? ' dora' : ''), i); });
+  if (G.drawn !== null) h += tileHtml(G.drawn, 'tsumo' + (G.sel === 13 ? ' sel' : '') + (G.drawn === G.dora ? ' dora' : ''), 13);
+  else h += '<div class="tile tsumo empty"></div>';
+  $('handWrap').innerHTML = h;
+  const hint = $('hint');
+  if (G.win) { hint.className = 'hud win'; hint.textContent = '上がれる！ Space で攻撃（' + G.win.han + '翻）'; }
+  else if (G.drawn !== null) { hint.className = 'hud'; hint.textContent = '1枚捨てる：ホイール/Z・Xで選んで 左クリック/F'; }
+  else { hint.className = 'hud'; hint.textContent = '欲しい牌の上に立とう。ダルマが振り向いた時の足元の牌をツモ'; }
+}
+$('handWrap').addEventListener('click', e => {
+  const el = e.target.closest('.tile');
+  if (!el || el.dataset.i === undefined) return;
+  const i = Number(el.dataset.i);
+  if (G.sel === i) discard(i); else { G.sel = i; renderHand(); }
+});
+
+// ===== HUD =====
+function fmt(t) { const s = Math.floor(t); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function updateHud() {
+  $('hpLabel').textContent = MODE.name + '｜' + MODE.daruma + ' HP ' + G.hp + ' / ' + P.hp;
+  $('hpFill').style.width = (G.hp / P.hp * 100) + '%';
+  const dist = Math.max(0, G.wallZ - G.pz);
+  $('status').innerHTML = '時間 <b>' + fmt(G.time) + '</b><br>締め切りまで <span' + (dist < 3 ? ' id="danger"' : '') + '><b>' +
+    dist.toFixed(1) + ' m</b></span><br>もういいや 残り <b>' + G.moiiya + '</b> 回<br>見つかった回数 <b>' + G.found + '</b><br>ドラ <b>' + num(G.dora) + SUITS[suit(G.dora)] + '</b>（表示牌 ' + num(G.doraInd) + SUITS[suit(G.doraInd)] + '）<br>足元の牌 <b>' +
+    (G.cell >= 0 ? num(tiles[G.cell].type) + SUITS[suit(tiles[G.cell].type)] : 'なし') + '</b>';
+  let text = '', color = '#fff';
+  if (G.time < G.msgUntil) { text = G.msg; color = G.msgColor; }
+  else if (G.state === 'warn') { text = MODE.warnText; color = '#ffd36b'; }
+  else if (G.state === 'look') { text = MODE.lookText; color = '#ff5a5a'; }
+  const m = $('msg'); m.textContent = text; m.style.color = color;
+  m.className = 'hud' + (G.state === 'look' && G.time >= G.msgUntil ? ' look' : '');
+  $('vignette').className = 'hud' + (G.state === 'look' ? ' look' : G.state === 'warn' ? ' warn' : '');
+  // 振り向き状態の表示
+  const st = $('stateText'), sf = $('stateFill');
+  if (G.state === 'back') {
+    st.textContent = MODE.daruma + 'は背を向けている（動ける）'; st.style.color = '#7ee08a';
+    sf.style.background = '#4caf50'; sf.style.width = (100 - G.stateT / G.stateDur * 100) + '%';
+  } else if (G.state === 'warn') {
+    st.textContent = '合図中…もうすぐ振り向く！'; st.style.color = '#ffd36b';
+    sf.style.background = '#f5b400'; sf.style.width = (100 - G.stateT / P.warn * 100) + '%';
+  } else {
+    st.textContent = '振り向き中！ 動くな　あと ' + Math.max(0, P.look - G.stateT).toFixed(1) + ' 秒';
+    st.style.color = '#ff6b6b';
+    sf.style.background = '#e53935'; sf.style.width = (100 - G.stateT / P.look * 100) + '%';
+  }
+}
+
+
+// ===== 入力 =====
+const keys = {};
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if ([' ', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k)) e.preventDefault();
+  if (keys[k]) return;
+  keys[k] = true;
+  if (!running) return;
+  if (k === ' ') declareWin();
+  else if (k === 'q') moiiya();
+  else if (k === 'f' || k === 'enter') discard();
+  else if (k === 'z') { G.sel = G.sel <= 0 ? maxSel() : G.sel - 1; renderHand(); }
+  else if (k === 'x') { G.sel = G.sel >= maxSel() ? 0 : G.sel + 1; renderHand(); }
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+window.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (!running) return;
+  G.sel = Math.max(0, Math.min(maxSel(), G.sel + (e.deltaY > 0 ? 1 : -1)));
+  renderHand();
+}, {passive: false});
+
+const locked = () => document.pointerLockElement === canvas;
+let rightDown = false;
+const zooming = () => running && (keys['e'] || rightDown);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('mousedown', e => { if (e.button === 2) rightDown = true; });
+window.addEventListener('mouseup', e => { if (e.button === 2) rightDown = false; });
+function tryLock() {
+  try { const p = canvas.requestPointerLock && canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) {}
+}
+let dragging = false;
+canvas.addEventListener('mousedown', e => {
+  if (!running) return;
+  if (e.button === 2) return;
+  if (locked()) { if (e.button === 0) discard(); return; }
+  dragging = true; tryLock();
+});
+window.addEventListener('mouseup', () => { dragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!running) return;
+  if (locked() || dragging) {
+    G.yaw -= e.movementX * 0.0025;
+    G.pitch = Math.max(-1.0, Math.min(0.6, G.pitch - e.movementY * 0.0025));
+  }
+});
+
+// ===== ゲーム進行 =====
+function swapFloor() {
+  tiles.forEach(tl => {
+    if (Math.random() < P.swapRate) { setTile(tl, randTile()); tl.flashUntil = G.time + 0.5; }
+  });
+}
+function stepDaruma(dt, speed) {
+  G.stateT += dt;
+  if (G.state === 'back' && G.stateT >= G.stateDur && G.quickNext) {
+    // 振り向き直し：合図なしでいきなり振り向く
+    G.quickNext = false;
+    G.state = 'look'; G.stateT = 0; G.foundThisLook = false;
+    flash('……と思ったら、もう一回！', '#ff8a8a', 1.3);
+    lookTsumo(); swapFloor();
+  }
+  else if (G.state === 'back' && G.stateT >= G.stateDur) {
+    G.state = 'warn'; G.stateT = 0;
+    if (MODE.tutorial && TUT[G.tut] && TUT[G.tut].setup) tutSeed();
+  }
+  else if (G.state === 'warn' && G.stateT >= P.warn && P.feint > 0 && Math.random() < P.feint) {
+    // フェイント：振り向くふりをしてやめる
+    G.state = 'back'; G.stateT = 0;
+    G.stateDur = P.backMin + Math.random() * (P.backMax - P.backMin);
+    G.shakeUntil = G.time + 0.4;
+    flash('……やっぱりいいや', '#c9b6ff', 1.3);
+  }
+  else if (G.state === 'warn' && G.stateT >= P.warn) {
+    G.state = 'look'; G.stateT = 0; G.foundThisLook = false; lookTsumo(); swapFloor();
+  } else if (G.state === 'look') {
+    if (!G.foundThisLook && G.stateT > P.grace && speed > P.detectSpeed) {
+      G.foundThisLook = true; G.found++;
+      G.wallZ -= P.wallPenalty;
+      flash(P.wallPenalty > 0 ? '見つかった！\n締め切りが' + P.wallPenalty + 'm迫る' : '見つかった！\n（練習なので壁は動かない）', '#ff5a5a', 1.6);
+    }
+    if (G.stateT >= P.look) {
+      G.state = 'back'; G.stateT = 0;
+      G.stateDur = P.backMin + Math.random() * (P.backMax - P.backMin);
+      if (P.quick > 0 && Math.random() < P.quick) { G.quickNext = true; G.stateDur = 1.0; }
+      if (!G.foundThisLook) tutEvent('safeLook');
+    }
+  }
+  const target = G.state === 'look' ? 0 : Math.PI;
+  daruma.rotation.y += (target - daruma.rotation.y) * Math.min(1, dt * 5);
+  daruma.position.x = G.time < G.shakeUntil ? Math.sin(G.time * 60) * 0.25 : 0;
+}
+function stepPlayer(dt) {
+  let f = 0, s = 0;
+  if (keys['w']) f += 1;
+  if (keys['s']) f -= 1;
+  if (keys['d']) s += 1;
+  if (keys['a']) s -= 1;
+  if (keys['arrowleft']) G.yaw += 2.2 * dt;
+  if (keys['arrowright']) G.yaw -= 2.2 * dt;
+  const len = Math.hypot(f, s) || 1;
+  const fx = -Math.sin(G.yaw), fz = -Math.cos(G.yaw);
+  const rx = Math.cos(G.yaw), rz = -Math.sin(G.yaw);
+  const ox = G.px, oz = G.pz;
+  G.px += (fx * f + rx * s) / len * P.moveSpeed * dt;
+  G.pz += (fz * f + rz * s) / len * P.moveSpeed * dt;
+  G.px = Math.max(-halfW + 0.25, Math.min(halfW - 0.25, G.px));
+  G.pz = Math.max(-floorLen + 0.3, Math.min(G.wallZ - 0.2, G.pz));
+  return Math.hypot(G.px - ox, G.pz - oz) / dt;
+}
+function stepFloor() {
+  const c = Math.floor((G.px + halfW) / S), r = Math.floor(-G.pz / S);
+  const cell = (c >= 0 && c < P.cols && r >= 0 && r < P.rows) ? r * P.cols + c : -1;
+  G.cell = cell;
+}
+// ダルマが振り向いた瞬間に、足元の牌をツモる
+function lookTsumo() {
+  if (G.cell < 0) { flash('牌の上にいない…\nツモなし', '#cccccc', 1.4); return; }
+  let cut = '';
+  if (G.drawn !== null) { cut = '（捨てなかった牌はツモ切り）'; G.drawn = null; }
+  const tl = tiles[G.cell];
+  const t = tl.type;
+  tsumo(t);
+  setTile(tl, randTile());
+  tutEvent('tsumo');
+  tl.flashUntil = G.time + 0.6;
+  flash(num(t) + SUITS[suit(t)] + ' をツモ！' + (cut ? '\n' + cut : ''), '#ffffff', 1.3);
+}
+function end(cleared) {
+  running = false;
+  try { if (document.exitPointerLock) document.exitPointerLock(); } catch (err) {}
+  $('resultTitle').textContent = cleared ? 'クリア！' : '締め切りアウト';
+  $('resultTitle').style.color = cleared ? '#ffd36b' : '#ff5a5a';
+  if (cleared && MODE.tutorial) {
+    $('resultTitle').textContent = 'チュートリアル完了！';
+    $('resultText').innerHTML = '基本の操作はこれでばっちり。<br>モード選択から「学科分けモード」に挑戦しよう。';
+    $('result').classList.remove('hidden');
+    return;
+  }
+  $('resultText').innerHTML = cleared
+    ? MODE.name + '：' + MODE.daruma + 'を倒した。タイム <b>' + fmt(G.time) + '</b>／見つかった回数 ' + G.found + ' 回'
+    : '締め切りの壁に追いつかれた…（ダルマの残りHP ' + G.hp + '）';
+  $('result').classList.remove('hidden');
+}
+function start() {
+  $('title').classList.add('hidden');
+  $('result').classList.add('hidden');
+  reset(); running = true; tutShow(); tryLock();
+}
+document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () => { applyMode(b.dataset.mode); start(); }));
+$('retryBtn').addEventListener('click', start);
+$('menuBtn').addEventListener('click', () => { $('result').classList.add('hidden'); $('title').classList.remove('hidden'); });
+
+// ===== ループ =====
+reset();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000) || 0.016;
+  last = now;
+  if (running) {
+    G.time += dt;
+    const speed = stepPlayer(dt);
+    G.moved += speed * dt; G.turned += Math.abs(G.yaw - G.lastYaw); G.lastYaw = G.yaw;
+    if (G.moved > 2) tutEvent('move');
+    if (G.turned > 0.8) tutEvent('turn');
+    stepFloor();
+    stepDaruma(dt, speed);
+    G.wallZ -= P.wallSpeed * dt;
+    if (G.wallZ - G.pz <= 0.45) end(false);
+    updateHud();
+  } else {
+    G.yaw = Math.sin(now / 4000) * 0.15;
+  }
+  tiles.forEach((tl, i) => {
+    // 遠くの牌ほどこちらに起き上がって見やすくなる（見た目だけ）
+    const d = G.pz - tl.mesh.position.z;
+    const tilt = Math.min(1, Math.max(0, (d - 5) / 16)) * 0.6;
+    tl.mesh.rotation.x = tilt;
+    tl.mesh.position.y = 0.06 + Math.sin(tilt) * S * 0.47;
+    const under = running && i === G.cell;
+    tl.top.emissive.setHex(tl.flashUntil > G.time ? 0x664400 : under ? 0x2a3f66 : (MODE.tutorial && TUT[G.tut] && TUT[G.tut].setup && TUT_WIN.includes(tl.type)) ? 0x2f9a2f : tl.type === G.dora ? 0x4a3500 : 0x000000);
+  });
+  // 振り向き演出：目が光る・赤いライト・空気が赤く染まる
+  const looking = running && G.state === 'look', warning = running && G.state === 'warn';
+  eyes.forEach(e => { e.visible = looking; });
+  glare.intensity += ((looking ? 2.6 + Math.sin(now / 90) * 0.4 : 0) - glare.intensity) * 0.15;
+  const fogTarget = looking ? FOG_LOOK : warning ? FOG_WARN : FOG_NORMAL;
+  scene.fog.color.lerp(fogTarget, 0.08);
+  scene.background.lerp(fogTarget, 0.08);
+  wall.position.set(0, toY(G.wallZ) + 3, toZ(G.wallZ));
+  wall.rotation.x = G.wallZ < 0 ? TH : 0;
+  camera.position.set(G.px, toY(G.pz) + EYE, toZ(G.pz));
+  camera.fov += ((zooming() ? 34 : 70) - camera.fov) * 0.18;
+  camera.updateProjectionMatrix();
+  camera.rotation.set(G.pitch, G.yaw, 0);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
