@@ -16,14 +16,29 @@ public static class DarumaSceneSetup
     static DarumaSceneSetup()
     {
         EditorApplication.delayCall += AutoSetup;
+        // ゲーム用シーンを開いたときにステージがなければ、その場で組み立てる
+        EditorSceneManager.sceneOpened += (scene, mode) =>
+        {
+            if (scene.path == ScenePath) EditorApplication.delayCall += BuildStageIfMissing;
+        };
     }
 
     static void AutoSetup()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode) return;
         if (!File.Exists(ScenePath)) { CreateScene(); return; }
+        // 何も開いていない（Untitled / サンプル）ならゲーム用シーンを開く
         var active = EditorSceneManager.GetActiveScene();
-        if (active.path == ScenePath && Object.FindFirstObjectByType<Stage>() == null) RebuildStage();
+        bool emptyOrSample = string.IsNullOrEmpty(active.path) || active.path.EndsWith("SampleScene.unity");
+        if (emptyOrSample && !active.isDirty) EditorSceneManager.OpenScene(ScenePath);
+        BuildStageIfMissing();
+    }
+
+    static void BuildStageIfMissing()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        if (EditorSceneManager.GetActiveScene().path != ScenePath) return;
+        if (Object.FindFirstObjectByType<Stage>() == null) RebuildStage();
     }
 
     [MenuItem("だるま/ゲームシーンを作り直す")]
