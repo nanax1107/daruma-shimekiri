@@ -51,7 +51,7 @@
   #winBtn.on{background:#d89b00;animation:glow .6s infinite alternate}
   @keyframes glow{to{box-shadow:0 0 14px #ffcc33}}
   #moiBtn{background:#3a4366}
-  #viewBtn{background:#2b3a2b}
+  #viewBtn{background:#2b3a2b;font-size:20px;padding:4px 10px}
   #keys{position:fixed;left:12px;bottom:136px;font-size:12.5px;line-height:1.7;background:#000a;padding:6px 10px;border-radius:8px}
   #keys b{display:inline-block;min-width:54px;color:#ffd36b}
   #hand img:hover{transform:translateY(-8px)}
@@ -105,7 +105,7 @@
 <div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ　<span style="background:#3ddc5a"></span>ほしい牌</div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
-<div id="keys"><b>← ↑ → ↓</b>移動<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
+<div id="keys"><b>← ↑ → ↓</b>移動<br><b>ドラッグ</b>見回す<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
 <div id="tutBox" class="hidden"><div id="tutStep"></div><div id="tutText"></div></div>
 <div id="handBar">
   <div id="foot">足元の牌<div class="none" id="footImg">なし</div></div>
@@ -114,7 +114,7 @@
     <button class="act" id="winBtn">上がり（Space）</button>
     <button class="act" id="moiBtn">もういいや</button>
     <button class="act" id="hintBtn" style="background:#245a2f">ヒント：OFF</button>
-    <button class="act" id="viewBtn" style="display:none">視点：一人称</button>
+    <button class="act" id="viewBtn" style="display:none"></button>
   </div>
 </div>
 
@@ -137,6 +137,7 @@
     <table>
       <tr><td>← ↑ → ↓</td><td>1マスずつ移動（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
       <tr><td>牌の上で待つ</td><td>ダルマが振り向いた瞬間、足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
+      <tr><td>画面をドラッグ</td><td>まわりを見回す（ダブルクリックで正面に戻る）</td></tr>
       <tr><td>手牌をクリック</td><td>その牌を捨てる（右端が今ツモった牌）</td></tr>
       <tr><td>Space</td><td>上がり → ダルマに攻撃（翻数＝ダメージ）。上がると壁が後退</td></tr>
       <tr><td>右下のボタン</td><td>「もういいや」＝手牌を配り直す（回数制限あり・壁が迫る）<br>「ヒント」＝ほしい牌を緑に光らせ、捨てるといい牌を教える<br>「視点」ボタンで一人称／上から／全体を切り替え</td></tr>
@@ -476,7 +477,22 @@ const VIEWS = [
   {name: '全体', back: 12, height: 30, ahead: 12},
 ];
 let view = 0;
-function cycleView() { view = (view + 1) % VIEWS.length; $('viewBtn').textContent = '視点：' + VIEWS[view].name; }
+// ===== マウスで視点移動（画面をドラッグ） =====
+let lookYaw = 0, lookPitch = 0, dragging = false, lastMX = 0, lastMY = 0;
+window.addEventListener('mousedown', e => {
+  if (e.target.tagName !== 'CANVAS' || e.target.id === 'mm') return;
+  dragging = true; lastMX = e.clientX; lastMY = e.clientY; document.body.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  lookYaw = Math.max(-1.7, Math.min(1.7, lookYaw - (e.clientX - lastMX) * 0.003));
+  lookPitch = Math.max(-0.9, Math.min(0.6, lookPitch - (e.clientY - lastMY) * 0.003));
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+window.addEventListener('mouseup', () => { dragging = false; document.body.style.cursor = ''; });
+// ダブルクリックで正面に戻す
+window.addEventListener('dblclick', e => { if (e.target.tagName === 'CANVAS') { lookYaw = 0; lookPitch = 0; } });
+function cycleView() { view = (view + 1) % VIEWS.length; $('viewBtn').title = '視点：' + VIEWS[view].name + '（クリックで切り替え）'; }
 $('viewBtn').addEventListener('click', cycleView);
 
 // ===== 入力 =====
@@ -809,8 +825,10 @@ function frame(now) {
   me.visible = !v.fp;
   if (v.fp) {
     // 一人称：自分の目の高さから、ダルマの方向（前）を見る。少し下を向いて足元の近くも見える
+    // マウスのドラッグで見回せる（yaw=左右, pitch=上下）
     camPos.lerp(new THREE.Vector3(G.px, 1.9, G.pz + 0.35), 0.25);
-    camLook.lerp(new THREE.Vector3(G.px * 0.85, 0.3, G.pz - 7), 0.25);
+    const p = -0.21 + lookPitch;
+    camLook.set(camPos.x - Math.sin(lookYaw) * Math.cos(p) * 8, camPos.y + Math.sin(p) * 8, camPos.z - Math.cos(lookYaw) * Math.cos(p) * 8);
   } else {
     const tx = G.px * 0.6;
     camPos.lerp(new THREE.Vector3(tx, v.height, G.pz + v.back), 0.08);
