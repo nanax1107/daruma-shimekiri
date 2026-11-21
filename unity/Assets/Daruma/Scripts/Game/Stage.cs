@@ -63,7 +63,7 @@ public static class JPText
         tm.characterSize = height / 9.6f;
         tm.anchor = TextAnchor.MiddleCenter;
         tm.alignment = TextAlignment.Center;
-        tm.fontStyle = FontStyle.Bold;
+        tm.fontStyle = FontStyle.Normal;
         tm.richText = false;
         tm.text = text;
         tm.color = color;

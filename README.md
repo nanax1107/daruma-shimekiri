@@ -58,4 +58,4 @@
 ## 素材
 
 - 牌の画像：[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)（パブリックドメイン CC0）
-- 日本語フォント（Unity 版）：IPAexゴシック（IPAフォントライセンス v1.0。`unity/Assets/Daruma/Licenses/` に同梱）
+- 日本語フォント（Unity 版）：[Dela Gothic One](https://fonts.google.com/specimen/Dela+Gothic+One)（SIL Open Font License 1.1。`unity/Assets/Daruma/Licenses/` に同梱）
