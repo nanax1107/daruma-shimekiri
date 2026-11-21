@@ -39,7 +39,7 @@
   #foot img{width:58px;height:77px;border-radius:5px;box-shadow:0 0 0 3px #ffd36b,0 4px 10px #000a;margin-top:3px}
   #foot .none{width:58px;height:77px;border-radius:5px;border:2px dashed #ffd36b88;margin-top:3px;display:flex;align-items:center;justify-content:center;color:#ffd36b99}
   #hand{display:flex;gap:3px;align-items:flex-end}
-  #hand img{width:52px;height:69px;border-radius:5px;cursor:pointer;transition:transform .08s;box-shadow:0 3px 6px #0008}
+  #hand img{width:52px;height:69px;border-radius:5px;cursor:default;transition:transform .08s;box-shadow:0 3px 6px #0008}
   #hand img.sel{transform:translateY(-12px);box-shadow:0 0 0 3px #ffcc33,0 6px 10px #000a}
   #hand img.dora{box-shadow:0 0 0 3px #e0a800,0 3px 6px #0008}
   #hand img.sel.dora{box-shadow:0 0 0 3px #ffcc33,0 0 0 6px #e0a800,0 6px 10px #000a}
@@ -105,7 +105,7 @@
 <div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ　<span style="background:#3ddc5a"></span>ほしい牌</div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
-<div id="keys"><b>W A S D</b>移動<br><b>クリック</b>牌を捨てる<br><b>ドラッグ</b>見回す</div>
+<div id="keys"><b>W A S D</b>移動<br><b>ドラッグ</b>見回す</div>
 <div id="tutBox" class="hidden"><div id="tutStep"></div><div id="tutText"></div></div>
 <div id="handBar">
   <div id="foot">足元の牌<div class="none" id="footImg">なし</div></div>
@@ -134,7 +134,7 @@
       <button class="mode" data-mode="lab"><b>研究室分けモード</b><span class="lv hard">むずかしい</span>
         </button>
     </div>
-    <p style="font-size:14px;color:#cfd6ee;margin:10px 0 0"><b>W A S D</b> 移動　／　<b>クリック</b> 牌を捨てる　／　<b>ドラッグ</b> 見回す</p>
+    <p style="font-size:14px;color:#cfd6ee;margin:10px 0 0"><b>W A S D</b> 移動　／　<b>ドラッグ</b> 見回す</p>
     <div class="credit">牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</div>
   </div>
 </div>
@@ -291,6 +291,12 @@ function lookTsumo() {
   renderHand(); tutEvent('tsumo');
   // そろったら自動で攻撃（Space も押せる）
   if (G.win) { flash('そろった！ 上がり！', '#ffd36b', 0.8); setTimeout(() => { if (G.win) declareWin(); }, 700); }
+  // 牌を捨てるのは自動（「捨て」マークの牌を少し見せてから捨てる）
+  else setTimeout(() => {
+    if (!running || G.drawn === null || G.win) return;
+    const i = G.recIdx >= 0 ? G.recIdx : 13, name = tileName(full()[i]);
+    discard(i); flash(name + ' を捨てた', '#ffb36b', 1.0);
+  }, 900);
 }
 function swapFloor() {
   for (const col of floor) for (const tl of col)
@@ -316,11 +322,10 @@ const TUT = [
   {ev: 'next', title: 'ヒント機能', html: () =>
     '覚えなくても大丈夫。このモードでは：<br>' +
     '・床で<b style="color:#5be37a">緑に光る牌</b>＝今ほしい牌。その上で待とう<br>' +
-    '・手牌の<b style="color:#ff9f43">「捨て」</b>マーク＝捨てるといい牌<br>' +
+    '・いらない牌は<b style="color:#ff9f43">自動で捨てる</b>（「捨て」マークが付いた牌）<br>' +
     '<small>ほかのモードでも右下の「ヒント」ボタンで使える。</small>'},
   {ev: 'move', text: 'W A S D キーで、1マスずつ歩いてみよう（W=前・S=後ろ・A=左・D=右）。右上の地図の真ん中が「足元の牌」。'},
   {ev: 'tsumo', text: '上のバーが緑の間は動ける。<b style="color:#5be37a">緑に光る牌</b>の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌が手牌に入る（ツモ）。'},
-  {ev: 'discard', text: 'ツモできた！ 手牌が14枚になったので1枚捨てる。<b style="color:#ff9f43">「捨て」</b>マークの付いた牌をクリックしよう。'},
   {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
   {ev: 'moiiya', text: '手が悪いときは右下の「もういいや」ボタン。手牌を全部配り直せる。押してみよう。'},
   {ev: 'win', setup: true, text: '最後は上がりの練習。あと1枚で上がれる手を用意した。<b style="color:#5be37a">緑に光る牌</b>の上に立って振り向きを待ち、ツモると<b>自動で攻撃</b>！<br><small>役（点数の種類）は覚えなくてOK。上がれば必ずダメージが入る。</small>'}
@@ -415,7 +420,7 @@ function narrowUseful(hand13, u) {
 }
 function updateHints() {
   G.recIdx = -1; G.useful = new Set(); G.shanten = null;
-  if (!hintsOn) return;
+  if (!hintsOn && G.drawn === null) return;   // 捨てる牌の計算は自動捨てのため常に行う
   if (G.drawn === null) {
     const u = usefulTiles(G.hand); G.useful = narrowUseful(G.hand, u); G.shanten = u.s;
   } else {
@@ -442,7 +447,7 @@ function renderHand() {
     im.src = TILE_SRC[t]; im.dataset.i = i; im.draggable = false;
     im.className = (i === G.sel ? 'sel ' : '') + (t === G.dora ? 'dora ' : '') + (extra || '');
     im.title = tileName(t) + (t === G.dora ? '（ドラ）' : '');
-    if (hintsOn && i === G.recIdx && !G.win) {
+    if (i === G.recIdx && !G.win) {
       const w = document.createElement('div'); w.className = 'recWrap';
       w.appendChild(im); const tag = document.createElement('span'); tag.className = 'recTag'; tag.textContent = '捨て';
       w.appendChild(tag); h.appendChild(w);
@@ -457,11 +462,7 @@ function renderHand() {
   $('moiBtn').textContent = 'もういいや（残り' + (G.moiiya > 50 ? '∞' : G.moiiya) + '回）';
   $('hintBtn').textContent = 'ヒント：' + (hintsOn ? 'ON' : 'OFF');
 }
-$('hand').addEventListener('click', e => {
-  const el = e.target.closest('img'); if (!el || !running) return;
-  if (G.drawn === null) { flash('捨てるのはツモったあと', '#ccc', 1.0); return; }
-  discard(Number(el.dataset.i));
-});
+
 $('winBtn').addEventListener('click', declareWin);
 $('moiBtn').addEventListener('click', moiiya);
 $('hintBtn').addEventListener('click', () => { hintsOn = !hintsOn; renderHand(); });
@@ -679,7 +680,7 @@ function updateDom() {
   }
   const left = '';
   $('hint').textContent = G.win ? '上がり！ 攻撃中（' + G.win.han + '翻）'
-    : G.drawn !== null ? left + (hintsOn ? '「捨て」マークの牌をクリックしよう' : '捨てる牌をクリック（右端が今ツモった牌）')
+    : G.drawn !== null ? 'いらない牌を自動で捨てるよ'
     : left + (hintsOn ? '緑に光る牌の上で、振り向きを待とう' : '欲しい牌の上に立って待とう。振り向いた瞬間の足元の牌がツモになる');
 
   $('hpLabel').textContent = M.name + '｜' + M.daruma + ' HP ' + G.hp + ' / ' + M.hp;
