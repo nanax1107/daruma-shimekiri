@@ -105,13 +105,13 @@
 <div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ　<span style="background:#3ddc5a"></span>ほしい牌</div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
-<div id="keys"><b>W A S D</b>移動<br><b>ドラッグ</b>見回す<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
+<div id="keys"><b>W A S D</b>移動<br><b>クリック</b>牌を捨てる<br><b>ドラッグ</b>見回す</div>
 <div id="tutBox" class="hidden"><div id="tutStep"></div><div id="tutText"></div></div>
 <div id="handBar">
   <div id="foot">足元の牌<div class="none" id="footImg">なし</div></div>
   <div id="hand"></div>
   <div id="buttons">
-    <button class="act" id="winBtn">上がり（Space）</button>
+    <button class="act" id="winBtn" style="display:none">上がり</button>
     <button class="act" id="moiBtn">もういいや</button>
     <button class="act" id="hintBtn" style="background:#245a2f">ヒント：OFF</button>
     <button class="act" id="viewBtn" style="display:none"></button>
@@ -122,27 +122,19 @@
   <div class="panel">
     <h1>だるまさんが締め切った</h1>
     <span class="tag">3D版・一人称視点（試作）</span>
-    <p>締め切り前夜の大学。欲しい牌の上に立って待とう。ダルマが振り向いた瞬間、<b>足元の牌</b>がツモになる。麻雀の役を作ってダルマを倒そう。
-      振り向いている間に動くと見つかって、後ろから<b>締め切りの壁</b>が迫ってくる。</p>
+    <p style="font-size:16px;line-height:1.8">ダルマが<b>振り向いた瞬間</b>に立っていた牌が手に入る。<br>
+      牌をそろえてダルマを倒そう。<b>振り向き中に動く</b>と、締め切りの壁が迫る！</p>
     <div class="modes">
       <button class="mode tutorial" data-mode="tut"><b>チュートリアル</b><span class="lv tut">はじめての人</span>
-        <small>麻雀を知らなくてもOK。牌の種類とそろえ方から説明し、ほしい牌・捨てる牌をヒントで教えてくれる。壁は動かないので負けない。</small></button>
+        <small>麻雀を知らなくてもOK</small></button>
       <button class="mode" data-mode="gakka"><b>学科分けモード</b><span class="lv easy">やさしい</span>
-        <small>GPAダルマ。振り向き8秒・壁はゆっくり・HP3。</small></button>
+        </button>
       <button class="mode" data-mode="zemi"><b>ゼミ分けモード</b><span class="lv normal">ふつう</span>
-        <small>教授ダルマ。振り向き6秒・壁が速い・HP5・フェイントあり。</small></button>
+        </button>
       <button class="mode" data-mode="lab"><b>研究室分けモード</b><span class="lv hard">むずかしい</span>
-        <small>ボスダルマ。振り向き5秒・壁がとても速い・HP6・振り向き直しあり。</small></button>
+        </button>
     </div>
-    <table>
-      <tr><td>W A S D</td><td>1マスずつ移動（W=前 S=後ろ A=左 D=右）（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
-      <tr><td>牌の上で待つ</td><td>ダルマが振り向いた瞬間、足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
-      <tr><td>画面をドラッグ</td><td>まわりを見回す（ダブルクリックで正面に戻る）</td></tr>
-      <tr><td>手牌をクリック</td><td>その牌を捨てる（右端が今ツモった牌）</td></tr>
-      <tr><td>Space</td><td>上がり → ダルマに攻撃（翻数＝ダメージ）。上がると壁が後退</td></tr>
-      <tr><td>右下のボタン</td><td>「もういいや」＝手牌を配り直す（回数制限あり・壁が迫る）<br>「ヒント」＝ほしい牌を緑に光らせ、捨てるといい牌を教える<br>「視点」ボタンで一人称／上から／全体を切り替え</td></tr>
-    </table>
-    <p style="font-size:12.5px;color:#aab;margin:8px 0 0">役：ツモ1／タンヤオ1／七対子2／対々和2／清一色6。ドラ1枚につき＋1翻。上がりの形は4面子1雀頭か七対子。字牌はなし。</p>
+    <p style="font-size:14px;color:#cfd6ee;margin:10px 0 0"><b>W A S D</b> 移動　／　<b>クリック</b> 牌を捨てる　／　<b>ドラッグ</b> 見回す</p>
     <div class="credit">牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</div>
   </div>
 </div>
@@ -288,12 +280,17 @@ function lookTsumo() {
   const tl = underTile();
   if (!tl) { flash('牌の上にいない…\nツモなし', '#ccc', 1.4); return; }
   let cut = '';
-  if (G.drawn !== null) { cut = '（捨てなかった牌はツモ切り）'; G.drawn = null; }
+  if (G.drawn !== null) {
+    if (hintsOn && G.recIdx >= 0) { discard(G.recIdx); cut = '（「捨て」の牌を自動で捨てた）'; }
+    else { cut = '（捨てなかった牌はツモ切り）'; G.drawn = null; }
+  }
   const t = tl.type;
   G.drawn = t; G.sel = 13; checkWin();
   tl.type = randTile(); tl.flash = G.time + 0.7;
   flash(tileName(t) + ' をツモ！' + (cut ? '\n' + cut : ''), '#fff', 1.3);
   renderHand(); tutEvent('tsumo');
+  // そろったら自動で攻撃（Space も押せる）
+  if (G.win) { flash('そろった！ 上がり！', '#ffd36b', 0.8); setTimeout(() => { if (G.win) declareWin(); }, 700); }
 }
 function swapFloor() {
   for (const col of floor) for (const tl of col)
@@ -327,7 +324,7 @@ const TUT = [
   {ev: 'discard', text: 'ツモできた！ 手牌が14枚になったので1枚捨てる。<b style="color:#ff9f43">「捨て」</b>マークの付いた牌をクリックしよう。'},
   {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
   {ev: 'moiiya', text: '手が悪いときは右下の「もういいや」ボタン。手牌を全部配り直せる。押してみよう。'},
-  {ev: 'win', setup: true, text: '最後は上がりの練習。あと1枚で上がれる手を用意した。<b style="color:#5be37a">緑に光る牌</b>の上に立って振り向きを待ち、ツモったら <b>Space</b> で攻撃！<br><small>役（点数の種類）は覚えなくてOK。上がれば必ずダメージが入る。</small>'}
+  {ev: 'win', setup: true, text: '最後は上がりの練習。あと1枚で上がれる手を用意した。<b style="color:#5be37a">緑に光る牌</b>の上に立って振り向きを待ち、ツモると<b>自動で攻撃</b>！<br><small>役（点数の種類）は覚えなくてOK。上がれば必ずダメージが入る。</small>'}
 ];
 const TUT_WIN = [0, 3, 6];
 function tutSeed() {
@@ -686,7 +683,7 @@ function updateDom() {
     else f.outerHTML = '<div class="none" id="footImg" data-k="none">なし</div>';
   }
   const left = (hintsOn && G.shanten !== null && !G.win) ? (G.shanten === 0 ? '【あと1枚で上がり！】' : '【あと' + (G.shanten + 1) + '枚くらいで上がり】') + ' ' : '';
-  $('hint').textContent = G.win ? '上がれる！ Space で攻撃（' + G.win.han + '翻）'
+  $('hint').textContent = G.win ? '上がり！ 攻撃中（' + G.win.han + '翻）'
     : G.drawn !== null ? left + (hintsOn ? '「捨て」マークの牌をクリックしよう' : '捨てる牌をクリック（右端が今ツモった牌）')
     : left + (hintsOn ? '緑に光る牌の上で、振り向きを待とう' : '欲しい牌の上に立って待とう。振り向いた瞬間の足元の牌がツモになる');
 
@@ -732,7 +729,7 @@ function start() {
   faceMat.map = FACES[modeKey]; faceMat.needsUpdate = true;
   bodyMat.color.set(M.color);
   $('title').classList.add('hidden'); $('result').classList.add('hidden');
-  hintsOn = !!M.tutorial;
+  hintsOn = true;
   reset(); running = true; tutShow(); renderHand();
   G.px = cellX(G.cy); G.pz = cellZ(G.cx);
 }
