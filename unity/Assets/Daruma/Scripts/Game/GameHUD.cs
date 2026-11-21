@@ -93,35 +93,35 @@ public class GameHUD : MonoBehaviour
     void DrawTitle(DarumaGame g, float W, float H)
     {
         Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.9f));
-        float pw = 640, px = (W - pw) / 2, ph = 420, y = (H - ph) / 2;
-        var panel = new Rect(px - 30, y - 24, pw + 60, ph + 40);
-        Fill(panel, Hex("#161a26")); Border(panel, Hex("#2f3756"), 1);
-        GUI.Label(new Rect(px, y, pw, 44), "<size=30>だるまさんが締め切った</size>", label); y += 56;
-        GUI.Label(new Rect(px, y, pw, 56),
-            "<size=16>ダルマが振り向いた瞬間に立っていた牌が手に入る。\n牌をそろえてダルマを倒そう。振り向き中に動くと、締め切りの壁が迫る！</size>", label);
-        y += 70;
+        float pw = Mathf.Min(860, W - 80), px = (W - pw) / 2, ph = 560, y = (H - ph) / 2;
+        var panel = new Rect(px - 34, y - 26, pw + 68, ph + 44);
+        Fill(panel, Hex("#161a26")); Border(panel, Hex("#2f3756"), 2);
+        GUI.Label(new Rect(px, y, pw, 64), "<size=48><color=#ffffff>だるまさんが締め切った</color></size>", label); y += 78;
+        GUI.Label(new Rect(px, y, pw, 70),
+            "<size=22>ダルマが<color=#ffd36b>振り向いた瞬間</color>に立っていた牌が手に入る。\n牌をそろえてダルマを倒そう。<color=#ff6b6b>振り向き中に動く</color>と、締め切りの壁が迫る！</size>", label);
+        y += 92;
 
         var modes = GameModes.Selectable;
-        DrawModeButton(g, modes[0], new Rect(px, y, pw, 74)); y += 86;
-        float bw = (pw - 20) / 3f;
+        DrawModeButton(g, modes[0], new Rect(px, y, pw, 96)); y += 110;
+        float bw = (pw - 24) / 3f;
         for (int i = 1; i < modes.Length; i++)
-            DrawModeButton(g, modes[i], new Rect(px + (i - 1) * (bw + 10), y, bw, 64));
-        y += 80;
-        GUI.Label(new Rect(px, y, pw, 24), "<color=#ffd36b>W A S D</color> 移動　／　<color=#ffd36b>ドラッグ</color> 見回す", label); y += 36;
-        GUI.Label(new Rect(px, y, pw, 20), "<color=#8890a8>牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</color>", small);
+            DrawModeButton(g, modes[i], new Rect(px + (i - 1) * (bw + 12), y, bw, 84));
+        y += 104;
+        GUI.Label(new Rect(px, y, pw, 32), "<size=22><color=#ffd36b>W A S D</color> 移動　／　<color=#ffd36b>ドラッグ</color> 見回す</size>", label); y += 46;
+        GUI.Label(new Rect(px, y, pw, 22), "<color=#8890a8>牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</color>", small);
     }
 
     void DrawModeButton(DarumaGame g, GameMode m, Rect r)
     {
         bool hover = r.Contains(Event.current.mousePosition);
         Fill(r, m.Tutorial ? Hex("#14213a") : Hex("#1e2436"));
-        Border(r, hover ? Color.white : m.Tutorial ? Hex("#3b82f6") : Hex("#2f3756"), 2);
+        Border(r, hover ? Color.white : m.Tutorial ? Hex("#3b82f6") : Hex("#2f3756"), 3);
         if (GUI.Button(r, "", GUIStyle.none)) g.StartMode(m);
-        GUI.Label(new Rect(r.x + 14, r.y + 8, r.width - 24, 26), m.Name, modeTitle);
-        var lv = new Rect(r.x + 14, r.y + 34, 92, 18);
+        GUI.Label(new Rect(r.x + 16, r.y + 10, r.width - 28, 36), "<size=26>" + m.Name + "</size>", modeTitle);
+        var lv = new Rect(r.x + 16, r.y + 48, 120, 24);
         Fill(lv, m.LevelColor);
-        GUI.Label(lv, "" + m.Level + "", Colored(tagStyle, Color.white));
-        if (!string.IsNullOrEmpty(m.Note)) GUI.Label(new Rect(r.x + 14, r.y + 52, r.width - 24, 20), "<color=#c0c6da>" + m.Note + "</color>", small);
+        GUI.Label(lv, "<size=16>" + m.Level + "</size>", Colored(tagStyle, Color.white));
+        if (!string.IsNullOrEmpty(m.Note)) GUI.Label(new Rect(r.x + 150, r.y + 46, r.width - 160, 28), "<size=19><color=#dfe4f2>" + m.Note + "</color></size>", label);
     }
 
     // ===== プレイ中の表示 =====
@@ -193,11 +193,19 @@ public class GameHUD : MonoBehaviour
         // 中央のメッセージ
         string text = ""; Color col = Color.white;
         if (g.T < g.MsgUntil) { text = g.Msg; col = g.MsgColor; }
-        else if (looking) { text = m.LookText; col = new Color(1f, 0.35f, 0.35f); }
+        else if (looking) { text = m.LookText; col = new Color(1f, 0.86f, 0.2f); }
         if (text != "")
         {
-            GUI.Label(new Rect(3, H * 0.36f + 3, W, 160), text, Colored(big, Color.black));
-            GUI.Label(new Rect(0, H * 0.36f, W, 160), text, Colored(big, col));
+            // 見やすいように：暗い帯の上に、太い黒ふち付きの大きな文字
+            int lines = text.Split('\n').Length;
+            float th = 70 * lines + 20, ty = H * 0.38f - th / 2;
+            for (int k = 0; k < 6; k++) Fill(new Rect(0, ty - 6 + k * 3, W, th + 12 - k * 6), new Color(0, 0, 0, 0.12f));
+            var st = new GUIStyle(big) { fontSize = 60 };
+            var outline = Colored(st, Color.black);
+            for (int ox = -3; ox <= 3; ox += 3)
+                for (int oy = -3; oy <= 3; oy += 3)
+                    if (ox != 0 || oy != 0) GUI.Label(new Rect(ox, ty + oy, W, th), text, outline);
+            GUI.Label(new Rect(0, ty, W, th), text, Colored(st, col));
         }
 
         // 下：ヒント文
