@@ -8,7 +8,8 @@
 | フォルダ | 中身 |
 | --- | --- |
 | `unity/` | Unity プロジェクト（Unity 6000.3.24f1 / URP） |
-| `web-prototype/` | ブラウザで遊べる試作版（`index.html` を開くだけで動く） |
+| `web-prototype/index.html` | ブラウザで遊べる3D試作版（開くだけで動く） |
+| `web-prototype/2d/index.html` | 上から見下ろす2D試作版（本物の牌の画像・1マスずつ移動） |
 
 ## Unity で開く
 
@@ -53,3 +54,7 @@
 - 同じシーン（`DarumaGame.unity`）を同時に編集しない。結合が難しいため、編集する人を決めてから触る
 - `Library/` などの自動生成フォルダは共有しない（`.gitignore` で除外済み）
 - WebGL で公開するときは、日本語フォントを `unity/Assets/Daruma/Resources/JPFont.ttf` として入れる
+
+## 素材
+
+- 牌の画像：[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)（パブリックドメイン CC0）
