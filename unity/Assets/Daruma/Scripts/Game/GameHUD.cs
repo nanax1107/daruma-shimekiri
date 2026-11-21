@@ -19,7 +19,7 @@ public class GameHUD : MonoBehaviour
     {
         if (label != null) return;
         // 画面の文字は Unity 標準フォントを使う（日本語は OS のフォントで自動的に表示される）
-        // ゲームっぽい極太の日本語フォント（Resources/JPFont.ttf = Dela Gothic One）。もともと太いので太字指定はしない
+        // ゲームっぽい極太の日本語フォント（Resources/GameFont.ttf = Dela Gothic One）。もともと太いので太字指定はしない
         var font = JPText.Font;
         label = new GUIStyle(GUI.skin.label) { font = font, fontSize = 15, richText = true, wordWrap = true };
         label.normal.textColor = Color.white;

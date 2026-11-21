@@ -38,13 +38,13 @@ public static class Mat
 
 public static class JPText
 {
-    // 日本語フォント：Resources/JPFont があればそれ、なければ Unity 標準フォント（Mac/Windows では OS の日本語フォントで表示される）
-    // WebGL で公開するときは Assets/Daruma/Resources/JPFont.ttf を入れること
+    // 日本語フォント：Resources/GameFont.ttf（Dela Gothic One）。なければ Unity 標準フォント
+    // フォントを変えるときは GameFont.ttf を差し替える
     public static Font Font
     {
         get
         {
-            var f = Resources.Load<Font>("JPFont");
+            var f = Resources.Load<Font>("GameFont");
             if (f == null) f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             return f;
         }
