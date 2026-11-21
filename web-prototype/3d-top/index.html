@@ -96,7 +96,7 @@
 
 <div id="topHud" class="hud">
   <div id="hpLabel"></div>
-  <div class="bar"><div id="hpFill"></div></div>
+  <div class="bar" style="display:none"><div id="hpFill"></div></div>
   <div id="stateText"></div>
   <div class="bar"><div id="stateFill"></div></div>
   <div id="track"><div id="trackWall"></div><span id="trackLabel">締切</span><div id="trackDaruma"></div><div id="trackMe">私</div></div>
@@ -529,12 +529,8 @@ function stepDaruma(dt) {
     G.quickNext = false; G.state = 'look'; G.stateT = 0; G.foundThisLook = false;
     flash('……と思ったら、もう一回！', '#ff8a8a', 1.3); lookTsumo(); swapFloor();
   } else if (G.state === 'back' && G.stateT >= G.stateDur) {
-    G.state = 'warn'; G.stateT = 0;
+    // 「もうすぐ振り向く」の合図はなし。いきなり振り向く
     if (tutSetupActive()) tutSeed();
-  } else if (G.state === 'warn' && G.stateT >= M.warn && M.feint > 0 && Math.random() < M.feint) {
-    G.state = 'back'; G.stateT = 0; G.stateDur = nextBack(); G.shakeUntil = G.time + 0.4;
-    flash('……やっぱりいいや', '#c9b6ff', 1.3);
-  } else if (G.state === 'warn' && G.stateT >= M.warn) {
     G.state = 'look'; G.stateT = 0; G.foundThisLook = false; lookTsumo(); swapFloor();
   } else if (G.state === 'look' && G.stateT >= M.look) {
     G.state = 'back'; G.stateT = 0; G.stateDur = nextBack();
