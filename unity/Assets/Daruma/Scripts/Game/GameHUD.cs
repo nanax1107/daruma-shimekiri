@@ -60,7 +60,7 @@ public class GameHUD : MonoBehaviour
         return GUI.Button(r, "", GUIStyle.none);
     }
     static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
-    static readonly Color PanelBg = new Color(0.03f, 0.04f, 0.07f, 0.78f);
+    static readonly Color PanelBg = new Color(0.03f, 0.04f, 0.07f, 0.92f);
 
     void OnGUI()
     {
@@ -92,7 +92,7 @@ public class GameHUD : MonoBehaviour
     // ===== タイトル（モード選択） =====
     void DrawTitle(DarumaGame g, float W, float H)
     {
-        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.86f));
+        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.9f));
         float pw = 640, px = (W - pw) / 2, ph = 420, y = (H - ph) / 2;
         var panel = new Rect(px - 30, y - 24, pw + 60, ph + 40);
         Fill(panel, Hex("#161a26")); Border(panel, Hex("#2f3756"), 1);
@@ -147,7 +147,7 @@ public class GameHUD : MonoBehaviour
 
         // 左上：時間
         var timeR = new Rect(12, 10, 96, 30);
-        Fill(timeR, new Color(0, 0, 0, 0.5f));
+        Fill(timeR, PanelBg);
         GUI.Label(new Rect(22, 14, 90, 24), "時間 <color=#ffd36b>" + ((int)g.T / 60) + ":" + ((int)g.T % 60).ToString("00") + "</color>", label);
 
         // 上：モード・HP・状態バー・通路の全体図
@@ -187,7 +187,7 @@ public class GameHUD : MonoBehaviour
 
         // 左下：操作
         var keysR = new Rect(12, H - 210, 150, 46);
-        Fill(keysR, new Color(0, 0, 0, 0.67f));
+        Fill(keysR, PanelBg);
         GUI.Label(new Rect(20, H - 206, 140, 40), "<color=#ffd36b>W A S D</color> 移動\n<color=#ffd36b>ドラッグ</color> 見回す", small);
 
         // 中央のメッセージ
@@ -260,7 +260,7 @@ public class GameHUD : MonoBehaviour
         if (st.Note != null) h += 22;
         if (st.Ev == "next") h += 40;
         var box = new Rect(x, y, w, h);
-        Fill(box, new Color(0.04f, 0.12f, 0.27f, 0.88f));
+        Fill(box, new Color(0.04f, 0.12f, 0.27f, 0.95f));
         Border(box, Hex("#3b82f6"), 1);
         float cy = y + 8;
         GUI.Label(new Rect(x + 14, cy, w - 28, 20), "<color=#9cc3ff>チュートリアル " + (g.Tut + 1) + " / " + DarumaGame.TutSteps.Length +
@@ -322,7 +322,7 @@ public class GameHUD : MonoBehaviour
     // ===== 結果 =====
     void DrawResult(DarumaGame g, float W, float H)
     {
-        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.86f));
+        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.9f));
         float pw = 460, px = (W - pw) / 2, py = H / 2 - 130;
         Fill(new Rect(px, py, pw, 250), Hex("#161a26")); Border(new Rect(px, py, pw, 250), Hex("#2f3756"), 1);
         string title, body;

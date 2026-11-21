@@ -26,6 +26,13 @@ public static class DarumaSceneSetup
     static void AutoSetup()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        // 画面の文字やパネル（IMGUI）が白っぽく薄く見えないよう、色空間を Gamma にする
+        if (PlayerSettings.colorSpace != ColorSpace.Gamma)
+        {
+            PlayerSettings.colorSpace = ColorSpace.Gamma;
+            AssetDatabase.SaveAssets();
+            Debug.Log("[だるま] 色空間を Gamma に変更しました（色がはっきり見えるように）");
+        }
         if (!File.Exists(ScenePath)) { CreateScene(); return; }
         // 何も開いていない（Untitled / サンプル）ならゲーム用シーンを開く
         var active = EditorSceneManager.GetActiveScene();
