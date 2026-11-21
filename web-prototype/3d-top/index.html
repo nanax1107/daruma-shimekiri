@@ -96,7 +96,7 @@
   <div id="track"><div id="trackWall"></div><span id="trackLabel">締切</span><div id="trackDaruma"></div><div id="trackMe">私</div></div>
 </div>
 <div id="info" class="hud"></div>
-<div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ef4444"></span>萬<span style="background:#3b82f6"></span>筒<span style="background:#22c55e"></span>索<br>○＝ドラ　□＝足元</div></div>
+<div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend">自分の周り（前4マス・後ろ2マス）<br><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ</div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
 <div id="keys"><b>← ↑ → ↓</b>移動<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
@@ -607,43 +607,48 @@ $('retryBtn').addEventListener('click', start);
 $('menuBtn').addEventListener('click', () => { $('result').classList.add('hidden'); $('title').classList.remove('hidden'); });
 
 
-// ===== ミニマップ（右上）：前（ダルマ側）が上 =====
+// ===== ミニマップ（右上）：自分の周りだけ。前（ダルマ側）が上 =====
 const mm = $('mm'), mg = mm.getContext('2d');
-const MC = 13;                                   // 1マスの大きさ（px）
-const M_LO = WALL_START, M_HI = COLS + 3.4;     // 縦に映す範囲（マス）
-const MW = ROWS * MC + 8, MH = Math.round((M_HI - M_LO) * MC);
+const MCW = 30, MCH = 40;                        // 1マスの大きさ（px）
+const AHEAD = 4, BEHIND = 2;                     // 前4マス・後ろ2マスを表示
+const MTOP = 20;                                 // 上の帯（ダルマの状態）
+const MW = ROWS * MCW + 8, MH = MTOP + (AHEAD + BEHIND + 1) * MCH + 4;
 const MDPR = Math.min(window.devicePixelRatio || 1, 2);
 mm.width = MW * MDPR; mm.height = MH * MDPR; mm.style.width = MW + 'px'; mm.style.height = MH + 'px';
 mg.scale(MDPR, MDPR);
-const MAP_COLORS = ['#ef4444', '#3b82f6', '#22c55e'];
-const mY = col => MH - (col - M_LO) * MC;        // col の下端の y
-const mX = row => 4 + row * MC;
 function drawMap() {
   mg.clearRect(0, 0, MW, MH);
   mg.fillStyle = '#1b2030'; mg.fillRect(0, 0, MW, MH);
-  mg.font = 'bold 9px sans-serif'; mg.textAlign = 'center'; mg.textBaseline = 'middle';
-  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
-    const f = floor[c][r], x = mX(r) + 1, y = mY(c + 1) + 1, w = MC - 2;
-    mg.fillStyle = f.flash > G.time ? '#ffd36b' : MAP_COLORS[suit(f.type)];
-    mg.fillRect(x, y, w, w);
-    mg.fillStyle = '#fff'; mg.fillText(String(num(f.type)), x + w / 2, y + w / 2 + 0.5);
-    if (f.type === G.dora) { mg.strokeStyle = '#fff'; mg.lineWidth = 1.5; mg.beginPath(); mg.arc(x + w / 2, y + w / 2, w / 2 - 0.5, 0, Math.PI * 2); mg.stroke(); }
+  // 上の帯：ダルマの状態
+  mg.fillStyle = G.state === 'look' ? '#d81e1e' : G.state === 'warn' ? '#b88700' : '#2a3250';
+  mg.fillRect(0, 0, MW, MTOP - 2);
+  mg.fillStyle = '#fff'; mg.font = 'bold 11px sans-serif'; mg.textAlign = 'center'; mg.textBaseline = 'middle';
+  mg.fillText('↑ ダルマ：' + (G.state === 'look' ? '見てる！' : G.state === 'warn' ? 'もうすぐ振り向く' : '背中'), MW / 2, MTOP / 2);
+  const top = G.cx + AHEAD;
+  const yOf = c => MTOP + (top - c) * MCH;      // マス c の上端
+  for (let c = G.cx - BEHIND; c <= top; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      const x = 4 + r * MCW, y = yOf(c);
+      if (c < 0 || c >= COLS) { mg.fillStyle = '#232838'; mg.fillRect(x + 1, y + 1, MCW - 2, MCH - 2); continue; }
+      const f = floor[c][r], img = IMGS[f.type];
+      if (img.complete) mg.drawImage(img, x + 1, y + 1, MCW - 2, MCH - 2);
+      if (f.type === G.dora) { mg.strokeStyle = '#e0a800'; mg.lineWidth = 2; mg.strokeRect(x + 1, y + 1, MCW - 2, MCH - 2); }
+      if (f.flash > G.time) { mg.fillStyle = 'rgba(255,210,110,.45)'; mg.fillRect(x + 1, y + 1, MCW - 2, MCH - 2); }
+    }
   }
-  // ダルマ（振り向き中は赤、合図中は黄色）
-  const dy = mY(COLS + 2.1);
-  mg.fillStyle = G.state === 'look' ? '#ff2020' : G.state === 'warn' ? '#f5b400' : M.color;
-  mg.beginPath(); mg.arc(MW / 2, dy, MC * 1.1, 0, Math.PI * 2); mg.fill();
-  mg.fillStyle = '#fff'; mg.font = 'bold 9px sans-serif'; mg.fillText(G.state === 'look' ? '見てる' : '背中', MW / 2, dy);
-  // 締め切りの壁（壁より後ろを赤く）
-  const wy = Math.min(MH, mY(G.wallX + 1));
-  mg.fillStyle = 'rgba(200,20,30,.55)'; mg.fillRect(0, wy, MW, MH - wy);
-  mg.fillStyle = '#ff3030'; mg.fillRect(0, wy - 2, MW, 3);
-  if (wy < MH - 8) { mg.fillStyle = '#fff'; mg.fillText('締切', MW / 2, Math.min(MH - 7, wy + 9)); }
-  // 自分（足元の枠＋三角）
-  const px = mX(G.cy), py = mY(G.cx + 1);
-  mg.strokeStyle = '#ffd36b'; mg.lineWidth = 2; mg.strokeRect(px + 0.5, py + 0.5, MC - 1, MC - 1);
-  mg.fillStyle = '#fff'; mg.strokeStyle = '#000'; mg.lineWidth = 1;
-  mg.beginPath(); mg.moveTo(px + MC / 2, py - 5); mg.lineTo(px + MC / 2 + 4, py + 1); mg.lineTo(px + MC / 2 - 4, py + 1); mg.closePath(); mg.fill(); mg.stroke();
+  // 締め切りの壁（範囲内に来たら赤く塗る）
+  const edgeY = yOf(G.wallX + 1) + MCH;          // 壁の前端の y
+  if (edgeY < MH) {
+    const wy = Math.max(MTOP, edgeY);
+    mg.fillStyle = 'rgba(200,20,30,.7)'; mg.fillRect(0, wy, MW, MH - wy);
+    mg.fillStyle = '#ff3030'; mg.fillRect(0, wy - 2, MW, 3);
+    mg.fillStyle = '#fff'; mg.font = 'bold 12px sans-serif'; mg.fillText('締切', MW / 2, Math.min(MH - 8, wy + 10));
+  }
+  // 足元：太い黄色の枠
+  const fx = 4 + G.cy * MCW, fy = yOf(G.cx);
+  mg.strokeStyle = '#ffd36b'; mg.lineWidth = 4; mg.strokeRect(fx, fy, MCW, MCH);
+  mg.fillStyle = '#ffd36b'; mg.font = 'bold 10px sans-serif';
+  mg.fillRect(fx, fy + MCH - 12, MCW, 12); mg.fillStyle = '#000'; mg.fillText('足元', fx + MCW / 2, fy + MCH - 6);
 }
 
 // ===== ループ =====
