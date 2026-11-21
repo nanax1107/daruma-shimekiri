@@ -81,7 +81,7 @@ public static class JPText
 [ExecuteAlways]
 public class Stage : MonoBehaviour
 {
-    public const int CurrentVersion = 2;     // 組み立て方を変えたら上げる（古いステージは自動で作り直す）
+    public const int CurrentVersion = 3;     // 組み立て方を変えたら上げる（古いステージは自動で作り直す）
     public int BuildVersion;
 
     [Header("シーン内の参照（作り直すと自動で入る）")]
@@ -191,6 +191,39 @@ public class Stage : MonoBehaviour
 #endif
         if (m == null) m = new Material(sh != null ? sh : JPText.Font.material.shader);
         m.name = "Text3D";
+        return m;
+    }
+
+    // だるまの顔の絵：光の当たり方に関係なくはっきり見えるよう Unlit、透明部分は切り抜き
+    static Material MakeFaceMat()
+    {
+        var sh = Shader.Find("Universal Render Pipeline/Unlit");
+        if (sh == null) sh = Shader.Find("Unlit/Transparent Cutout");
+        Material m = null;
+#if UNITY_EDITOR
+        string path = "Assets/Daruma/Materials/DarumaFacePicture.mat";
+        if (!Application.isPlaying)
+        {
+            EnsureFolder();
+            m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        }
+#endif
+        if (m == null) m = new Material(sh);
+        m.shader = sh;
+        m.name = "DarumaFacePicture";
+        var tex = Resources.Load<Texture2D>("DarumaFace");
+        if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", tex);
+        if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", tex);
+        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
+        if (m.HasProperty("_AlphaClip")) m.SetFloat("_AlphaClip", 1);
+        if (m.HasProperty("_Cutoff")) m.SetFloat("_Cutoff", 0.5f);
+        m.EnableKeyword("_ALPHATEST_ON");
+        m.SetOverrideTag("RenderType", "TransparentCutout");
+        m.renderQueue = 2450;
+#if UNITY_EDITOR
+        if (!Application.isPlaying) EditorUtility.SetDirty(m);
+#endif
         return m;
     }
 
@@ -321,26 +354,19 @@ public class Stage : MonoBehaviour
         st.Daruma = Group("Daruma", tr).transform;
         st.Daruma.localPosition = new Vector3(0, 0, (cols + 3) * CZ);
         var bodyMat = MakeMat("DarumaBody", new Color(0.78f, 0.13f, 0.16f));
-        var faceMat = MakeMat("DarumaFace", new Color(0.97f, 0.92f, 0.85f));
-        var blackMat = MakeMat("Black", new Color(0.05f, 0.05f, 0.05f));
         var glowMat = MakeMat("EyeGlow", new Color(1f, 0.1f, 0.1f), new Color(3f, 0.2f, 0.2f));
         st.DarumaBody = Prim(PrimitiveType.Sphere, "Body", st.Daruma, new Vector3(0, 2.4f, 0), new Vector3(4.8f, 5.2f, 4.8f), bodyMat).GetComponent<Renderer>();
         var face = Group("Face (こちら側が正面)", st.Daruma).transform;
-        var disc = Prim(PrimitiveType.Cylinder, "Face Disc", face, new Vector3(0, 2.8f, -2.25f), new Vector3(3.0f, 0.05f, 2.5f), faceMat);
-        disc.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        Prim(PrimitiveType.Sphere, "Eye L", face, new Vector3(-0.6f, 2.95f, -2.3f), Vector3.one * 0.38f, blackMat);
-        Prim(PrimitiveType.Sphere, "Eye R", face, new Vector3(0.6f, 2.95f, -2.3f), Vector3.one * 0.38f, blackMat);
-        var b1 = Prim(PrimitiveType.Cube, "Brow L", face, new Vector3(-0.65f, 3.5f, -2.3f), new Vector3(0.8f, 0.12f, 0.05f), blackMat);
-        b1.transform.localRotation = Quaternion.Euler(0, 0, -12);
-        var b2 = Prim(PrimitiveType.Cube, "Brow R", face, new Vector3(0.65f, 3.5f, -2.3f), new Vector3(0.8f, 0.12f, 0.05f), blackMat);
-        b2.transform.localRotation = Quaternion.Euler(0, 0, 12);
+        // 顔：伝統的なだるまの顔の絵（鶴の眉・亀のひげ・金の縁取り）。Resources/DarumaFace.png
+        Prim(PrimitiveType.Quad, "Face Picture", face, new Vector3(0, 2.6f, -2.45f), new Vector3(3.6f, 3.6f, 1), MakeFaceMat());
         st.GlowEyes = new[]
         {
-            Prim(PrimitiveType.Sphere, "Glow L (振り向き中だけ表示)", face, new Vector3(-0.6f, 2.95f, -2.42f), Vector3.one * 0.3f, glowMat),
-            Prim(PrimitiveType.Sphere, "Glow R (振り向き中だけ表示)", face, new Vector3(0.6f, 2.95f, -2.42f), Vector3.one * 0.3f, glowMat),
+            Prim(PrimitiveType.Sphere, "Glow L (振り向き中だけ表示)", face, new Vector3(-0.58f, 3.05f, -2.5f), Vector3.one * 0.3f, glowMat),
+            Prim(PrimitiveType.Sphere, "Glow R (振り向き中だけ表示)", face, new Vector3(0.58f, 3.05f, -2.5f), Vector3.one * 0.3f, glowMat),
         };
         foreach (var e in st.GlowEyes) e.SetActive(false);
-        st.FaceLabel = JPText.Make(face, "Label", "GPA", new Color(1f, 0.83f, 0.42f), 0.6f, new Vector3(0, 1.95f, -2.3f), Quaternion.identity, st.TextMaterial);
+        // おなかの金文字（モードごとに GPA／教授／ボス）
+        st.FaceLabel = JPText.Make(face, "Label", "GPA", new Color(1f, 0.8f, 0.25f), 0.9f, new Vector3(0, 0.75f, -1.95f), Quaternion.Euler(-20, 0, 0), st.TextMaterial);
         var glareGo = Group("Glare (振り向き中の赤いライト)", st.Daruma);
         glareGo.transform.localPosition = new Vector3(0, 3, -4);
         st.Glare = glareGo.AddComponent<Light>();
