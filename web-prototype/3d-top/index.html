@@ -686,7 +686,7 @@ function updateDom() {
   $('hpLabel').textContent = M.name + '｜' + M.daruma + ' HP ' + G.hp + ' / ' + M.hp;
   $('hpFill').style.width = (G.hp / M.hp * 100) + '%';
   let st, sc, ratio;
-  if (G.state === 'back') { st = M.daruma + 'は背を向けている（動ける）'; sc = '#7ee08a'; ratio = 1 - G.stateT / G.stateDur; }
+  if (G.state === 'back') { st = ''; sc = '#7ee08a'; ratio = 1 - G.stateT / G.stateDur; }
   else if (G.state === 'warn') { st = '合図中…もうすぐ振り向く！'; sc = '#ffd36b'; ratio = 1 - G.stateT / M.warn; }
   else { st = '振り向き中！ 動くな　あと ' + Math.max(0, M.look - G.stateT).toFixed(1) + ' 秒'; sc = '#ff6b6b'; ratio = 1 - G.stateT / M.look; }
   $('stateText').textContent = st; $('stateText').style.color = sc;
