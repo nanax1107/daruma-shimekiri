@@ -102,7 +102,7 @@
   <div id="track"><div id="trackWall"></div><span id="trackLabel">締切</span><div id="trackDaruma"></div><div id="trackMe">私</div></div>
 </div>
 <div id="info" class="hud"></div>
-<div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ　<span style="background:#3ddc5a"></span>ほしい牌</div></div>
+<div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ　<i id="lgWant" style="font-style:normal"><span style="background:#3ddc5a"></span>ほしい牌</i></div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
 <div id="keys"><b>W A S D</b>移動<br><b>ドラッグ</b>見回す</div>
@@ -323,7 +323,7 @@ const TUT = [
     '覚えなくても大丈夫。このモードでは：<br>' +
     '・床で<b style="color:#5be37a">緑に光る牌</b>＝今ほしい牌。その上で待とう<br>' +
     '・いらない牌は<b style="color:#ff9f43">自動で捨てる</b>（「捨て」マークが付いた牌）<br>' +
-    '<small>ほかのモードでも右下の「ヒント」ボタンで使える。</small>'},
+    '<small>緑に光るヒントは、チュートリアルと学科分けモードだけ。</small>'},
   {ev: 'move', text: 'W A S D キーで、1マスずつ歩いてみよう（W=前・S=後ろ・A=左・D=右）。右上の地図の真ん中が「足元の牌」。'},
   {ev: 'tsumo', text: '上のバーが緑の間は動ける。<b style="color:#5be37a">緑に光る牌</b>の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌が手牌に入る（ツモ）。'},
   {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
@@ -725,7 +725,9 @@ function start() {
   faceMat.map = FACES[modeKey]; faceMat.needsUpdate = true;
   bodyMat.color.set(M.color);
   $('title').classList.add('hidden'); $('result').classList.add('hidden');
-  hintsOn = true;
+  // ほしい牌（緑に光る）は、チュートリアルと一番簡単な学科分けモードだけ
+  hintsOn = modeKey === 'tut' || modeKey === 'gakka';
+  $('hintBtn').style.display = hintsOn ? '' : 'none'; $('lgWant').style.display = hintsOn ? '' : 'none';
   reset(); running = true; tutShow(); renderHand();
   G.px = cellX(G.cy); G.pz = cellZ(G.cx);
 }
