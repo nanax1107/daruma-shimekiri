@@ -198,14 +198,14 @@ public class GameHUD : MonoBehaviour
         {
             // 見やすいように：暗い帯の上に、太い黒ふち付きの大きな文字
             int lines = text.Split('\n').Length;
-            float th = 70 * lines + 20, ty = H * 0.38f - th / 2;
-            for (int k = 0; k < 6; k++) Fill(new Rect(0, ty - 6 + k * 3, W, th + 12 - k * 6), new Color(0, 0, 0, 0.12f));
+            float msgH = 70 * lines + 20, ty = H * 0.38f - msgH / 2;
+            for (int k = 0; k < 6; k++) Fill(new Rect(0, ty - 6 + k * 3, W, msgH + 12 - k * 6), new Color(0, 0, 0, 0.12f));
             var st = new GUIStyle(big) { fontSize = 60 };
             var outline = Colored(st, Color.black);
             for (int ox = -3; ox <= 3; ox += 3)
                 for (int oy = -3; oy <= 3; oy += 3)
-                    if (ox != 0 || oy != 0) GUI.Label(new Rect(ox, ty + oy, W, th), text, outline);
-            GUI.Label(new Rect(0, ty, W, th), text, Colored(st, col));
+                    if (ox != 0 || oy != 0) GUI.Label(new Rect(ox, ty + oy, W, msgH), text, outline);
+            GUI.Label(new Rect(0, ty, W, msgH), text, Colored(st, col));
         }
 
         // 下：ヒント文
