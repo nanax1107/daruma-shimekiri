@@ -317,7 +317,6 @@ const TUT = [
     '覚えなくても大丈夫。このモードでは：<br>' +
     '・床で<b style="color:#5be37a">緑に光る牌</b>＝今ほしい牌。その上で待とう<br>' +
     '・手牌の<b style="color:#ff9f43">「捨て」</b>マーク＝捨てるといい牌<br>' +
-    '・画面下に「あと何枚で上がり」が出る<br>' +
     '<small>ほかのモードでも右下の「ヒント」ボタンで使える。</small>'},
   {ev: 'move', text: 'W A S D キーで、1マスずつ歩いてみよう（W=前・S=後ろ・A=左・D=右）。右上の地図の真ん中が「足元の牌」。'},
   {ev: 'tsumo', text: '上のバーが緑の間は動ける。<b style="color:#5be37a">緑に光る牌</b>の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌が手牌に入る（ツモ）。'},
@@ -678,7 +677,7 @@ function updateDom() {
     if (tl) f.outerHTML = '<img id="footImg" data-k="' + want + '" src="' + TILE_SRC[tl.type] + '" title="' + tileName(tl.type) + '">';
     else f.outerHTML = '<div class="none" id="footImg" data-k="none">なし</div>';
   }
-  const left = (hintsOn && G.shanten !== null && !G.win) ? (G.shanten === 0 ? '【あと1枚で上がり！】' : '【あと' + (G.shanten + 1) + '枚くらいで上がり】') + ' ' : '';
+  const left = '';
   $('hint').textContent = G.win ? '上がり！ 攻撃中（' + G.win.han + '翻）'
     : G.drawn !== null ? left + (hintsOn ? '「捨て」マークの牌をクリックしよう' : '捨てる牌をクリック（右端が今ツモった牌）')
     : left + (hintsOn ? '緑に光る牌の上で、振り向きを待とう' : '欲しい牌の上に立って待とう。振り向いた瞬間の足元の牌がツモになる');
