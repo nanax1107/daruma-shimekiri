@@ -19,12 +19,14 @@ public class GameHUD : MonoBehaviour
     {
         if (label != null) return;
         // 画面の文字は Unity 標準フォントを使う（日本語は OS のフォントで自動的に表示される）
-        label = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
+        // 日本語フォント（Resources/JPFont.ttf = IPAexゴシック）。ブラウザ版のゴシック体に近い見た目にする
+        var font = JPText.Font;
+        label = new GUIStyle(GUI.skin.label) { font = font, fontSize = 15, richText = true, wordWrap = true };
         label.normal.textColor = Color.white;
         small = new GUIStyle(label) { fontSize = 12 };
         center = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = 15, fontStyle = FontStyle.Bold };
         big = new GUIStyle(center) { fontSize = 40 };
-        button = new GUIStyle(GUI.skin.button) { fontSize = 14, fontStyle = FontStyle.Bold, richText = true };
+        button = new GUIStyle(center) { fontSize = 14 };
         modeTitle = new GUIStyle(label) { fontSize = 17, fontStyle = FontStyle.Bold, wordWrap = false };
         tagStyle = new GUIStyle(center) { fontSize = 11 };
         tagStyle.normal.textColor = Color.black;
@@ -48,6 +50,17 @@ public class GameHUD : MonoBehaviour
         else Fill(r, new Color(0.96f, 0.95f, 0.9f));
     }
     GUIStyle Colored(GUIStyle s, Color c) { var n = new GUIStyle(s); n.normal.textColor = c; return n; }
+
+    // ブラウザ版と同じ色のボタン（押されたら true）
+    bool Btn(Rect r, string text, Color bg)
+    {
+        bool hover = r.Contains(Event.current.mousePosition);
+        Fill(r, hover ? Color.Lerp(bg, Color.white, 0.12f) : bg);
+        GUI.Label(r, "<b>" + text + "</b>", button);
+        return GUI.Button(r, "", GUIStyle.none);
+    }
+    static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
+    static readonly Color PanelBg = new Color(0.03f, 0.04f, 0.07f, 0.78f);
 
     void OnGUI()
     {
@@ -79,9 +92,10 @@ public class GameHUD : MonoBehaviour
     // ===== タイトル（モード選択） =====
     void DrawTitle(DarumaGame g, float W, float H)
     {
-        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.025f, 0.05f, 0.75f));
+        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.86f));
         float pw = 640, px = (W - pw) / 2, ph = 420, y = (H - ph) / 2;
-        Fill(new Rect(px - 30, y - 24, pw + 60, ph + 40), new Color(0.086f, 0.1f, 0.15f, 0.98f));
+        var panel = new Rect(px - 30, y - 24, pw + 60, ph + 40);
+        Fill(panel, Hex("#161a26")); Border(panel, Hex("#2f3756"), 1);
         GUI.Label(new Rect(px, y, pw, 44), "<size=30><b>だるまさんが締め切った</b></size>", label); y += 56;
         GUI.Label(new Rect(px, y, pw, 56),
             "<size=16>ダルマが<b>振り向いた瞬間</b>に立っていた牌が手に入る。\n牌をそろえてダルマを倒そう。<b>振り向き中に動く</b>と、締め切りの壁が迫る！</size>", label);
@@ -99,9 +113,10 @@ public class GameHUD : MonoBehaviour
 
     void DrawModeButton(DarumaGame g, GameMode m, Rect r)
     {
-        if (GUI.Button(r, "", button)) g.StartMode(m);
-        Fill(new Rect(r.x + 2, r.y + 2, r.width - 4, r.height - 4), new Color(0.12f, 0.14f, 0.21f));
-        if (m.Tutorial) Border(r, new Color(0.23f, 0.51f, 0.96f), 2);
+        bool hover = r.Contains(Event.current.mousePosition);
+        Fill(r, m.Tutorial ? Hex("#14213a") : Hex("#1e2436"));
+        Border(r, hover ? Color.white : m.Tutorial ? Hex("#3b82f6") : Hex("#2f3756"), 2);
+        if (GUI.Button(r, "", GUIStyle.none)) g.StartMode(m);
         GUI.Label(new Rect(r.x + 14, r.y + 8, r.width - 24, 26), m.Name, modeTitle);
         var lv = new Rect(r.x + 14, r.y + 34, 92, 18);
         Fill(lv, m.LevelColor);
@@ -119,20 +134,26 @@ public class GameHUD : MonoBehaviour
         // 画面のふち：振り向き中は赤、壁が近いと薄い赤
         if (looking || dist < 1.5f)
         {
-            var edge = looking ? new Color(1, 0, 0, 0.35f) : new Color(1, 0.1f, 0.1f, 0.18f);
-            Fill(new Rect(0, 0, W, 16), edge); Fill(new Rect(0, H - 16, W, 16), edge);
-            Fill(new Rect(0, 0, 16, H), edge); Fill(new Rect(W - 16, 0, 16, H), edge);
+            // 外側ほど濃い赤（ブラウザ版の内側の影に近づける）
+            var baseCol = looking ? new Color(1, 0, 0, 0.5f) : new Color(1, 0, 0, 0.35f);
+            for (int k = 0; k < 10; k++)
+            {
+                float a = baseCol.a * (1 - k / 10f) * 0.22f, o = k * 9;
+                var c2 = new Color(baseCol.r, baseCol.g, baseCol.b, a);
+                Fill(new Rect(0, o, W, 9), c2); Fill(new Rect(0, H - o - 9, W, 9), c2);
+                Fill(new Rect(o, 0, 9, H), c2); Fill(new Rect(W - o - 9, 0, 9, H), c2);
+            }
         }
 
         // 左上：時間
         var timeR = new Rect(12, 10, 96, 30);
-        Fill(timeR, new Color(0, 0, 0, 0.55f));
+        Fill(timeR, new Color(0, 0, 0, 0.5f));
         GUI.Label(new Rect(22, 14, 90, 24), "時間 <color=#ffd36b><b>" + ((int)g.T / 60) + ":" + ((int)g.T % 60).ToString("00") + "</b></color>", label);
 
         // 上：モード・HP・状態バー・通路の全体図
         float bw = Mathf.Min(600, W * 0.48f), bx = (W - bw) / 2;
         var topR = new Rect(bx - 14, 8, bw + 28, 112);
-        Fill(topR, new Color(0, 0, 0, 0.55f));
+        Fill(topR, PanelBg);
         GUI.Label(new Rect(bx, 12, bw, 22), m.Name + "｜" + m.DarumaName + " HP " + g.Hp + " / " + m.Hp, center);
         float ratio; Color sc;
         if (looking)
@@ -141,17 +162,19 @@ public class GameHUD : MonoBehaviour
             GUI.Label(new Rect(bx, 36, bw, 22), "振り向き中！ 動くな　あと " + Mathf.Max(0, m.Look - g.StateT).ToString("0.0") + " 秒", Colored(center, sc));
         }
         else { sc = new Color(0.5f, 0.88f, 0.55f); ratio = 1 - g.StateT / Mathf.Max(0.01f, g.StateDur); }
-        Fill(new Rect(bx, 62, bw, 10), new Color(1, 1, 1, 0.15f));
+        Fill(new Rect(bx, 62, bw, 10), new Color(1, 1, 1, 0.13f));
         Fill(new Rect(bx, 62, bw * Mathf.Clamp01(ratio), 10), sc);
         // 通路（左端 = 壁の初期位置、右端 = ダルマ）
         var trk = new Rect(bx, 82, bw, 24);
-        Fill(trk, new Color(0.1f, 0.12f, 0.2f));
+        Fill(trk, Hex("#1c2233")); Border(trk, Hex("#3a4366"), 1);
         float lo = DarumaGame.WallStart, hi = DarumaGame.Cols + 2;
         System.Func<float, float> pct = x => Mathf.Clamp01((x - lo) / (hi - lo));
-        Fill(new Rect(trk.x, trk.y, trk.width * pct(g.WallX + 1), trk.height), new Color(0.7f, 0.06f, 0.1f));
+        float ww = trk.width * pct(g.WallX + 1);
+        Fill(new Rect(trk.x, trk.y, ww, trk.height), Hex("#a0141c"));
+        Fill(new Rect(trk.x + ww - 3, trk.y, 3, trk.height), Hex("#ff4040"));
         GUI.Label(new Rect(trk.x + 4, trk.y + 2, 60, 20), "<b>締切</b>", small);
         float mx = trk.x + trk.width * pct(g.Cx + 0.5f);
-        Fill(new Rect(mx - 9, trk.y + 3, 18, 18), new Color(0.23f, 0.51f, 0.96f));
+        Fill(new Rect(mx - 10, trk.y + 2, 20, 20), Color.white); Fill(new Rect(mx - 8, trk.y + 4, 16, 16), Hex("#3b82f6"));
         GUI.Label(new Rect(mx - 9, trk.y + 3, 18, 18), "私", Colored(tagStyle, Color.white));
         Fill(new Rect(trk.xMax - 18, trk.y + 5, 14, 14), looking ? Color.red : m.DarumaColor);
         rects.Add(topR);
@@ -164,7 +187,7 @@ public class GameHUD : MonoBehaviour
 
         // 左下：操作
         var keysR = new Rect(12, H - 210, 150, 46);
-        Fill(keysR, new Color(0, 0, 0, 0.55f));
+        Fill(keysR, new Color(0, 0, 0, 0.67f));
         GUI.Label(new Rect(20, H - 206, 140, 40), "<color=#ffd36b><b>W A S D</b></color> 移動\n<color=#ffd36b><b>ドラッグ</b></color> 見回す", small);
 
         // 中央のメッセージ
@@ -183,12 +206,13 @@ public class GameHUD : MonoBehaviour
         else if (g.Drawn >= 0) hint = "いらない牌を自動で捨てるよ";
         else hint = g.HintsOn ? "緑に光る牌の上で、振り向きを待とう" : "欲しい牌の上に立って待とう。振り向いた瞬間の足元の牌がツモになる";
         var hr = new Rect((W - 480) / 2, H - 156, 480, 26);
-        Fill(hr, g.Win != null ? new Color(0.72f, 0.53f, 0.04f, 0.95f) : new Color(0, 0, 0, 0.6f));
+        Fill(hr, g.Win != null ? Hex("#b8870b") : new Color(0, 0, 0, 0.67f));
         GUI.Label(hr, hint, center);
 
         // 下：足元の牌・手牌・ボタン
         var bar = new Rect(0, H - 124, W, 124);
-        Fill(bar, new Color(0.03f, 0.04f, 0.07f, 0.8f));
+        for (int k = 0; k < 8; k++) Fill(new Rect(0, bar.y + k * 6, W, 6), new Color(0, 0, 0, 0.67f * k / 8f));
+        Fill(new Rect(0, bar.y + 48, W, bar.height - 48), new Color(0, 0, 0, 0.67f));
         rects.Add(bar);
         float tw = 48, th = 64, gap = 4;
         float handW = 13 * (tw + gap) + 14 + tw;
@@ -221,8 +245,8 @@ public class GameHUD : MonoBehaviour
 
         // ボタン
         float bx2 = Mathf.Min(W - 190, x0 + handW + 24), by = H - 112;
-        if (GUI.Button(new Rect(bx2, by, 176, 34), "もういいや（残り" + (g.MoiiyaLeft > 50 ? "∞" : g.MoiiyaLeft.ToString()) + "回）", button)) g.Moiiya();
-        if (m.Hints && GUI.Button(new Rect(bx2, by + 42, 176, 34), "ヒント：" + (g.HintsOn ? "ON" : "OFF"), button)) g.ToggleHints();
+        if (Btn(new Rect(bx2, by, 176, 34), "もういいや（残り" + (g.MoiiyaLeft > 50 ? "∞" : g.MoiiyaLeft.ToString()) + "回）", Hex("#3a4366"))) g.Moiiya();
+        if (m.Hints && Btn(new Rect(bx2, by + 42, 176, 34), "ヒント：" + (g.HintsOn ? "ON" : "OFF"), Hex("#245a2f"))) g.ToggleHints();
     }
 
     Rect DrawTutorial(DarumaGame g)
@@ -236,8 +260,8 @@ public class GameHUD : MonoBehaviour
         if (st.Note != null) h += 22;
         if (st.Ev == "next") h += 40;
         var box = new Rect(x, y, w, h);
-        Fill(box, new Color(0.04f, 0.12f, 0.28f, 0.92f));
-        Border(box, new Color(0.23f, 0.51f, 0.96f), 1);
+        Fill(box, new Color(0.04f, 0.12f, 0.27f, 0.88f));
+        Border(box, Hex("#3b82f6"), 1);
         float cy = y + 8;
         GUI.Label(new Rect(x + 14, cy, w - 28, 20), "<color=#9cc3ff><b>チュートリアル " + (g.Tut + 1) + " / " + DarumaGame.TutSteps.Length +
             (st.Title != null ? "　" + st.Title : "") + "</b></color>", small);
@@ -255,7 +279,7 @@ public class GameHUD : MonoBehaviour
             cy += 4;
         }
         if (st.Note != null) { GUI.Label(new Rect(x + 14, cy, w - 28, 20), "<color=#b8c8ec>" + st.Note + "</color>", small); cy += 22; }
-        if (st.Ev == "next" && GUI.Button(new Rect(x + w - 124, cy + 2, 110, 30), "次へ ▶", button)) g.TutEvent("next");
+        if (st.Ev == "next" && Btn(new Rect(x + w - 124, cy + 2, 110, 30), "次へ ▶", Hex("#1565c0"))) g.TutEvent("next");
         return box;
     }
 
@@ -265,7 +289,7 @@ public class GameHUD : MonoBehaviour
         float mw = cw * 3 + pad * 2, mh = ch * 3 + pad * 2;
         float x0 = W - mw - 12, y0 = 10;
         var box = new Rect(x0, y0, mw, mh + 24);
-        Fill(box, new Color(0.03f, 0.04f, 0.07f, 0.8f));
+        Fill(box, PanelBg);
         for (int dc = 1; dc >= -1; dc--)
         {
             for (int dr = -1; dr <= 1; dr++)
@@ -298,16 +322,16 @@ public class GameHUD : MonoBehaviour
     // ===== 結果 =====
     void DrawResult(DarumaGame g, float W, float H)
     {
-        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.025f, 0.05f, 0.82f));
+        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.024f, 0.047f, 0.86f));
         float pw = 460, px = (W - pw) / 2, py = H / 2 - 130;
-        Fill(new Rect(px, py, pw, 250), new Color(0.086f, 0.1f, 0.15f, 0.98f));
+        Fill(new Rect(px, py, pw, 250), Hex("#161a26")); Border(new Rect(px, py, pw, 250), Hex("#2f3756"), 1);
         string title, body;
         if (g.Cleared && g.Mode.Tutorial) { title = "<color=#ffd36b>チュートリアル完了！</color>"; body = "これで遊び方はばっちり。\nモード選択から「学科分けモード」に挑戦しよう。"; }
         else if (g.Cleared) { title = "<color=#ffd36b>クリア！</color>"; body = g.Mode.Name + "：" + g.Mode.DarumaName + "を倒した。\nタイム " + ((int)g.T / 60) + ":" + ((int)g.T % 60).ToString("00") + "／見つかった回数 " + g.Found + " 回"; }
         else { title = "<color=#ff5a5a>締め切りアウト</color>"; body = "締め切りの壁に追いつかれた…（ダルマの残りHP " + g.Hp + "）"; }
         GUI.Label(new Rect(px, py + 20, pw, 50), "<size=34><b>" + title + "</b></size>", center);
         GUI.Label(new Rect(px + 20, py + 80, pw - 40, 70), body, new GUIStyle(label) { alignment = TextAnchor.UpperCenter });
-        if (GUI.Button(new Rect(px + 40, py + 170, 180, 44), "もう一度", button)) g.StartMode(g.Mode);
-        if (GUI.Button(new Rect(px + 240, py + 170, 180, 44), "モード選択へ", button)) g.BackToTitle();
+        if (Btn(new Rect(px + 40, py + 170, 180, 44), "もう一度", Hex("#dd3333"))) g.StartMode(g.Mode);
+        if (Btn(new Rect(px + 240, py + 170, 180, 44), "モード選択へ", Hex("#3a4366"))) g.BackToTitle();
     }
 }
