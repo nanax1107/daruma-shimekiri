@@ -10,7 +10,7 @@
 | `unity/` | Unity プロジェクト（Unity 6000.3.24f1 / URP） |
 | `web-prototype/index.html` | ブラウザで遊べる3D試作版（開くだけで動く） |
 | `web-prototype/2d/index.html` | 上から見下ろす2D試作版（本物の牌の画像・1マスずつ移動） |
-| `web-prototype/3d-top/index.html` | 3D試作版の改良版（上から視点・本物の牌の画像・1マス移動・壁の位置表示） |
+| `web-prototype/3d-top/index.html` | 3D試作版の改良版（一人称視点＋右上ミニマップ・本物の牌の画像・1マス移動・壁の位置表示。視点ボタンで上からにも切り替え可） |
 
 ## Unity で開く
 

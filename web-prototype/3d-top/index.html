@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>だるまさんが締め切った 3D版（上から視点・試作）</title>
+<title>だるまさんが締め切った 3D版（一人称視点・試作）</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#0b0d14;color:#fff;
     font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;user-select:none}
@@ -55,8 +55,12 @@
   #keys{position:fixed;left:12px;bottom:136px;font-size:12.5px;line-height:1.7;background:#000a;padding:6px 10px;border-radius:8px}
   #keys b{display:inline-block;min-width:54px;color:#ffd36b}
   #hand img:hover{transform:translateY(-8px)}
+  #mapBox{position:fixed;top:10px;right:12px;background:rgba(8,10,18,.78);padding:8px;border-radius:10px;text-align:center;pointer-events:none}
+  #mm{display:block}
+  #mapLegend{font-size:11px;margin-top:5px;line-height:1.5}
+  #mapLegend span{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px}
   #hint{position:fixed;left:50%;bottom:132px;transform:translateX(-50%);font-size:14px;background:#000a;padding:5px 14px;border-radius:6px;white-space:nowrap}
-  #tutBox{position:fixed;right:14px;top:150px;width:290px;background:rgba(10,30,70,.88);border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;font-size:14px;line-height:1.65}
+  #tutBox{position:fixed;left:12px;top:56px;width:290px;background:rgba(10,30,70,.88);border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;font-size:14px;line-height:1.65}
   #tutStep{font-size:12px;color:#9cc3ff;font-weight:700}
   .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,12,.86);z-index:10;padding:16px;box-sizing:border-box}
   .panel{max-width:680px;max-height:100%;overflow:auto;padding:24px 28px;background:#161a26;border:1px solid #2f3756;border-radius:14px;line-height:1.7;box-sizing:border-box}
@@ -92,6 +96,7 @@
   <div id="track"><div id="trackWall"></div><span id="trackLabel">締切</span><div id="trackDaruma"></div><div id="trackMe">私</div></div>
 </div>
 <div id="info" class="hud"></div>
+<div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ef4444"></span>萬<span style="background:#3b82f6"></span>筒<span style="background:#22c55e"></span>索<br>○＝ドラ　□＝足元</div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
 <div id="keys"><b>← ↑ → ↓</b>移動<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
@@ -102,14 +107,14 @@
   <div id="buttons">
     <button class="act" id="winBtn">上がり（Space）</button>
     <button class="act" id="moiBtn">もういいや</button>
-    <button class="act" id="viewBtn">視点：上から</button>
+    <button class="act" id="viewBtn">視点：一人称</button>
   </div>
 </div>
 
 <div id="title" class="overlay">
   <div class="panel">
     <h1>だるまさんが締め切った</h1>
-    <span class="tag">3D版・上から視点（試作）</span>
+    <span class="tag">3D版・一人称視点（試作）</span>
     <p>締め切り前夜の大学。欲しい牌の上に立って待とう。ダルマが振り向いた瞬間、<b>足元の牌</b>がツモになる。麻雀の役を作ってダルマを倒そう。
       振り向いている間に動くと見つかって、後ろから<b>締め切りの壁</b>が迫ってくる。</p>
     <div class="modes">
@@ -127,7 +132,7 @@
       <tr><td>牌の上で待つ</td><td>ダルマが振り向いた瞬間、足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
       <tr><td>手牌をクリック</td><td>その牌を捨てる（右端が今ツモった牌）</td></tr>
       <tr><td>Space</td><td>上がり → ダルマに攻撃（翻数＝ダメージ）。上がると壁が後退</td></tr>
-      <tr><td>右下のボタン</td><td>「もういいや」＝手牌を配り直す（回数制限あり・壁が迫る）<br>「視点」ボタンで上から／低め／全体を切り替え</td></tr>
+      <tr><td>右下のボタン</td><td>「もういいや」＝手牌を配り直す（回数制限あり・壁が迫る）<br>「視点」ボタンで一人称／上から／全体を切り替え</td></tr>
     </table>
     <p style="font-size:12.5px;color:#aab;margin:8px 0 0">役：ツモ1／タンヤオ1／七対子2／対々和2／清一色6。ドラ1枚につき＋1翻。上がりの形は4面子1雀頭か七対子。字牌はなし。</p>
     <div class="credit">牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</div>
@@ -351,8 +356,8 @@ $('moiBtn').addEventListener('click', moiiya);
 
 // ===== 視点 =====
 const VIEWS = [
+  {name: '一人称', fp: true},
   {name: '上から', back: 7.5, height: 13, ahead: 0.5},
-  {name: '低め', back: 5, height: 5, ahead: 6},
   {name: '全体', back: 12, height: 30, ahead: 12},
 ];
 let view = 0;
@@ -601,10 +606,50 @@ document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () =
 $('retryBtn').addEventListener('click', start);
 $('menuBtn').addEventListener('click', () => { $('result').classList.add('hidden'); $('title').classList.remove('hidden'); });
 
+
+// ===== ミニマップ（右上）：前（ダルマ側）が上 =====
+const mm = $('mm'), mg = mm.getContext('2d');
+const MC = 13;                                   // 1マスの大きさ（px）
+const M_LO = WALL_START, M_HI = COLS + 3.4;     // 縦に映す範囲（マス）
+const MW = ROWS * MC + 8, MH = Math.round((M_HI - M_LO) * MC);
+const MDPR = Math.min(window.devicePixelRatio || 1, 2);
+mm.width = MW * MDPR; mm.height = MH * MDPR; mm.style.width = MW + 'px'; mm.style.height = MH + 'px';
+mg.scale(MDPR, MDPR);
+const MAP_COLORS = ['#ef4444', '#3b82f6', '#22c55e'];
+const mY = col => MH - (col - M_LO) * MC;        // col の下端の y
+const mX = row => 4 + row * MC;
+function drawMap() {
+  mg.clearRect(0, 0, MW, MH);
+  mg.fillStyle = '#1b2030'; mg.fillRect(0, 0, MW, MH);
+  mg.font = 'bold 9px sans-serif'; mg.textAlign = 'center'; mg.textBaseline = 'middle';
+  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
+    const f = floor[c][r], x = mX(r) + 1, y = mY(c + 1) + 1, w = MC - 2;
+    mg.fillStyle = f.flash > G.time ? '#ffd36b' : MAP_COLORS[suit(f.type)];
+    mg.fillRect(x, y, w, w);
+    mg.fillStyle = '#fff'; mg.fillText(String(num(f.type)), x + w / 2, y + w / 2 + 0.5);
+    if (f.type === G.dora) { mg.strokeStyle = '#fff'; mg.lineWidth = 1.5; mg.beginPath(); mg.arc(x + w / 2, y + w / 2, w / 2 - 0.5, 0, Math.PI * 2); mg.stroke(); }
+  }
+  // ダルマ（振り向き中は赤、合図中は黄色）
+  const dy = mY(COLS + 2.1);
+  mg.fillStyle = G.state === 'look' ? '#ff2020' : G.state === 'warn' ? '#f5b400' : M.color;
+  mg.beginPath(); mg.arc(MW / 2, dy, MC * 1.1, 0, Math.PI * 2); mg.fill();
+  mg.fillStyle = '#fff'; mg.font = 'bold 9px sans-serif'; mg.fillText(G.state === 'look' ? '見てる' : '背中', MW / 2, dy);
+  // 締め切りの壁（壁より後ろを赤く）
+  const wy = Math.min(MH, mY(G.wallX + 1));
+  mg.fillStyle = 'rgba(200,20,30,.55)'; mg.fillRect(0, wy, MW, MH - wy);
+  mg.fillStyle = '#ff3030'; mg.fillRect(0, wy - 2, MW, 3);
+  if (wy < MH - 8) { mg.fillStyle = '#fff'; mg.fillText('締切', MW / 2, Math.min(MH - 7, wy + 9)); }
+  // 自分（足元の枠＋三角）
+  const px = mX(G.cy), py = mY(G.cx + 1);
+  mg.strokeStyle = '#ffd36b'; mg.lineWidth = 2; mg.strokeRect(px + 0.5, py + 0.5, MC - 1, MC - 1);
+  mg.fillStyle = '#fff'; mg.strokeStyle = '#000'; mg.lineWidth = 1;
+  mg.beginPath(); mg.moveTo(px + MC / 2, py - 5); mg.lineTo(px + MC / 2 + 4, py + 1); mg.lineTo(px + MC / 2 - 4, py + 1); mg.closePath(); mg.fill(); mg.stroke();
+}
+
 // ===== ループ =====
 reset();
 G.px = cellX(G.cy); G.pz = cellZ(G.cx);
-const camPos = new THREE.Vector3(0, 12, 8), camLook = new THREE.Vector3(0, 0, -4);
+const camPos = new THREE.Vector3(0, 1.9, 1.2), camLook = new THREE.Vector3(0, 0.3, -6);
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000) || 0.016; last = now;
@@ -647,12 +692,20 @@ function frame(now) {
   wallEdge.position.set(0, 2.45, frontZ);
   const dist = G.cx - G.wallX - 1;
   edgeMat.color.setHex(dist < 2 && Math.sin(now / 70) > 0 ? 0xffffff : 0xff4040);
-  // カメラ：自分の少し後ろの上から見下ろす（壁も画面下に入る）
+  // カメラ
   const v = VIEWS[view];
-  const tx = G.px * 0.6;
-  camPos.lerp(new THREE.Vector3(tx, v.height, G.pz + v.back), 0.08);
-  camLook.lerp(new THREE.Vector3(tx, 0, G.pz - v.ahead), 0.08);
+  me.visible = !v.fp;
+  if (v.fp) {
+    // 一人称：自分の目の高さから、ダルマの方向（前）を見る。少し下を向いて足元の近くも見える
+    camPos.lerp(new THREE.Vector3(G.px, 1.9, G.pz + 0.35), 0.25);
+    camLook.lerp(new THREE.Vector3(G.px * 0.85, 0.3, G.pz - 7), 0.25);
+  } else {
+    const tx = G.px * 0.6;
+    camPos.lerp(new THREE.Vector3(tx, v.height, G.pz + v.back), 0.08);
+    camLook.lerp(new THREE.Vector3(tx, 0, G.pz - v.ahead), 0.08);
+  }
   camera.position.copy(camPos); camera.lookAt(camLook);
+  drawMap();
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
