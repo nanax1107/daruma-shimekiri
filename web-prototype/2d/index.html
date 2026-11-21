@@ -27,6 +27,9 @@
   #winBtn.on{background:#d89b00;animation:glow .6s infinite alternate}
   @keyframes glow{to{box-shadow:0 0 14px #ffcc33}}
   #moiBtn{background:#3a4366}
+  #keys{position:fixed;left:12px;bottom:136px;font-size:12.5px;line-height:1.7;background:#000a;padding:6px 10px;border-radius:8px}
+  #keys b{display:inline-block;min-width:54px;color:#ffd36b}
+  #hand img:hover{transform:translateY(-8px)}
   #hint{position:fixed;left:50%;bottom:132px;transform:translateX(-50%);font-size:14px;background:#000a;padding:5px 14px;border-radius:6px;white-space:nowrap}
   #tutBox{position:fixed;right:14px;top:92px;width:290px;background:rgba(10,30,70,.88);border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;font-size:14px;line-height:1.65}
   #tutStep{font-size:12px;color:#9cc3ff;font-weight:700}
@@ -55,13 +58,14 @@
 <canvas id="c"></canvas>
 
 <div id="hint"></div>
+<div id="keys"><b>← ↑ → ↓</b>移動<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
 <div id="tutBox" class="hidden"><div id="tutStep"></div><div id="tutText"></div></div>
 <div id="handBar">
   <div id="foot">足元の牌<div class="none" id="footImg">なし</div></div>
   <div id="hand"></div>
   <div id="buttons">
     <button class="act" id="winBtn">上がり（Space）</button>
-    <button class="act" id="moiBtn">もういいや（Q）</button>
+    <button class="act" id="moiBtn">もういいや</button>
   </div>
 </div>
 
@@ -82,12 +86,11 @@
         <small>ボスダルマ。振り向き5秒・壁がとても速い・HP6・振り向き直しあり。</small></button>
     </div>
     <table>
-      <tr><td>矢印キー</td><td>1マスずつ移動（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
+      <tr><td>← ↑ → ↓</td><td>1マスずつ移動（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
       <tr><td>牌の上で待つ</td><td>ダルマが振り向いた瞬間、足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
-      <tr><td>牌をクリック / Z・X</td><td>捨てる牌を選ぶ（選んだ牌をもう一度クリックで捨てる）</td></tr>
-      <tr><td>F / Enter</td><td>選んだ牌を捨てる</td></tr>
+      <tr><td>手牌をクリック</td><td>その牌を捨てる（右端が今ツモった牌）</td></tr>
       <tr><td>Space</td><td>上がり → ダルマに攻撃（翻数＝ダメージ）。上がると壁が後退</td></tr>
-      <tr><td>Q</td><td>もういいや（手牌を配り直す・回数制限あり・壁が迫る）</td></tr>
+      <tr><td>右下のボタン</td><td>「もういいや」＝手牌を配り直す（回数制限あり・壁が迫る）</td></tr>
     </table>
     <p style="font-size:12.5px;color:#aab;margin:8px 0 0">役：ツモ1／タンヤオ1／七対子2／対々和2／清一色6。ドラ1枚につき＋1翻。上がりの形は4面子1雀頭か七対子。字牌はなし。</p>
     <div class="credit">牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</div>
@@ -241,11 +244,11 @@ function swapFloor() {
 
 // ===== チュートリアル =====
 const TUT = [
-  {ev: 'move', text: '矢印キーで、1マスずつ歩いてみよう。黄色い枠が「足元の牌」。左下にも大きく出る。'},
+  {ev: 'move', text: '← ↑ → ↓ キーで、1マスずつ歩いてみよう。黄色い枠が「足元の牌」。左下にも大きく出る。'},
   {ev: 'tsumo', text: '上のバーが緑の間は動ける。欲しい牌の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌がツモになる。'},
-  {ev: 'discard', text: 'ツモできた！ 振り向き中は動かずに、手牌をクリックして選び、もう一度クリック（または F）で1枚捨てよう。'},
+  {ev: 'discard', text: 'ツモできた！ 振り向き中は動かずに、いらない手牌をクリックして1枚捨てよう。'},
   {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは左の「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
-  {ev: 'moiiya', text: '手が悪いときは Q（または右下のボタン）で「もういいや」。手牌を全部配り直せる。押してみよう。'},
+  {ev: 'moiiya', text: '手が悪いときは右下の「もういいや」ボタン。手牌を全部配り直せる。押してみよう。'},
   {ev: 'win', setup: true, text: '最後は上がりの練習。あと1枚で上がれる手を用意した。緑に光る 一萬・四萬・七萬 の上に立って振り向きを待ち、ツモったら Space で攻撃！'}
 ];
 const TUT_WIN = [0, 3, 6];
@@ -289,12 +292,12 @@ function renderHand() {
   const wb = document.getElementById('winBtn');
   wb.className = 'act' + (G.win ? ' on' : '');
   wb.textContent = G.win ? '上がり！ ' + G.win.han + '翻（Space）' : '上がり（Space）';
-  document.getElementById('moiBtn').textContent = 'もういいや 残り' + (G.moiiya > 50 ? '∞' : G.moiiya) + '（Q）';
+  document.getElementById('moiBtn').textContent = 'もういいや（残り' + (G.moiiya > 50 ? '∞' : G.moiiya) + '回）';
 }
 document.getElementById('hand').addEventListener('click', e => {
   const el = e.target.closest('img'); if (!el || !running) return;
-  const i = Number(el.dataset.i);
-  if (G.sel === i) discard(i); else { G.sel = i; renderHand(); }
+  if (G.drawn === null) { flash('捨てるのはツモったあと', '#ccc', 1.0); return; }
+  discard(Number(el.dataset.i));
 });
 document.getElementById('winBtn').addEventListener('click', declareWin);
 document.getElementById('moiBtn').addEventListener('click', moiiya);
@@ -310,10 +313,6 @@ window.addEventListener('keydown', e => {
   keys[k] = true;
   if (e.repeat) return;
   if (k === ' ') declareWin();
-  else if (k === 'q') moiiya();
-  else if (k === 'f' || k === 'enter') discard();
-  else if (k === 'z') { G.sel = G.sel <= 0 ? maxSel() : G.sel - 1; renderHand(); }
-  else if (k === 'x') { G.sel = G.sel >= maxSel() ? 0 : G.sel + 1; renderHand(); }
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -514,8 +513,8 @@ function updateDom() {
     else { f.outerHTML = '<div class="none" id="footImg" data-k="none">なし</div>'; }
   }
   const hint = document.getElementById('hint');
-  if (G.win) hint.textContent = '上がれる！ Space か「上がり」ボタンで攻撃（' + G.win.han + '翻）';
-  else if (G.drawn !== null) hint.textContent = '1枚捨てる：手牌をクリックで選んで、もう一度クリック（または F）';
+  if (G.win) hint.textContent = '上がれる！ Space で攻撃（' + G.win.han + '翻）';
+  else if (G.drawn !== null) hint.textContent = '捨てる牌をクリック（右端が今ツモった牌）';
   else hint.textContent = '欲しい牌の上に立って待とう。振り向いた瞬間の足元の牌がツモになる';
 }
 
