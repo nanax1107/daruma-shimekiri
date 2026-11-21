@@ -19,11 +19,11 @@ public class GameHUD : MonoBehaviour
     {
         if (label != null) return;
         // 画面の文字は Unity 標準フォントを使う（日本語は OS のフォントで自動的に表示される）
-        // ゲームっぽい極太の日本語フォント（Resources/GameFont.ttf = Dela Gothic One）。もともと太いので太字指定はしない
+        // 筆文字の日本語フォント（Resources/BrushFont.ttf = Yuji Syuku）
         var font = JPText.Font;
-        label = new GUIStyle(GUI.skin.label) { font = font, fontSize = 15, richText = true, wordWrap = true };
+        label = new GUIStyle(GUI.skin.label) { font = font, fontSize = 16, richText = true, wordWrap = true };
         label.normal.textColor = Color.white;
-        small = new GUIStyle(label) { fontSize = 13 };
+        small = new GUIStyle(label) { fontSize = 14 };
         center = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = 15, fontStyle = FontStyle.Normal };
         big = new GUIStyle(center) { fontSize = 40 };
         button = new GUIStyle(center) { fontSize = 14 };
