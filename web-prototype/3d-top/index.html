@@ -105,7 +105,7 @@
 <div id="mapBox"><canvas id="mm"></canvas><div id="mapLegend"><span style="background:#ffd36b"></span>足元　<span style="background:#e0a800"></span>ドラ　<span style="background:#3ddc5a"></span>ほしい牌</div></div>
 <div id="msg" class="hud"></div>
 <div id="hint"></div>
-<div id="keys"><b>← ↑ → ↓</b>移動<br><b>ドラッグ</b>見回す<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
+<div id="keys"><b>W A S D</b>移動<br><b>ドラッグ</b>見回す<br><b>クリック</b>手牌を捨てる<br><b>Space</b>上がり</div>
 <div id="tutBox" class="hidden"><div id="tutStep"></div><div id="tutText"></div></div>
 <div id="handBar">
   <div id="foot">足元の牌<div class="none" id="footImg">なし</div></div>
@@ -135,7 +135,7 @@
         <small>ボスダルマ。振り向き5秒・壁がとても速い・HP6・振り向き直しあり。</small></button>
     </div>
     <table>
-      <tr><td>← ↑ → ↓</td><td>1マスずつ移動（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
+      <tr><td>W A S D</td><td>1マスずつ移動（W=前 S=後ろ A=左 D=右）（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
       <tr><td>牌の上で待つ</td><td>ダルマが振り向いた瞬間、足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
       <tr><td>画面をドラッグ</td><td>まわりを見回す（ダブルクリックで正面に戻る）</td></tr>
       <tr><td>手牌をクリック</td><td>その牌を捨てる（右端が今ツモった牌）</td></tr>
@@ -322,7 +322,7 @@ const TUT = [
     '・手牌の<b style="color:#ff9f43">「捨て」</b>マーク＝捨てるといい牌<br>' +
     '・画面下に「あと何枚で上がり」が出る<br>' +
     '<small>ほかのモードでも右下の「ヒント」ボタンで使える。</small>'},
-  {ev: 'move', text: '← ↑ → ↓ キーで、1マスずつ歩いてみよう。右上の地図の真ん中が「足元の牌」。'},
+  {ev: 'move', text: 'W A S D キーで、1マスずつ歩いてみよう（W=前・S=後ろ・A=左・D=右）。右上の地図の真ん中が「足元の牌」。'},
   {ev: 'tsumo', text: '上のバーが緑の間は動ける。<b style="color:#5be37a">緑に光る牌</b>の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌が手牌に入る（ツモ）。'},
   {ev: 'discard', text: 'ツモできた！ 手牌が14枚になったので1枚捨てる。<b style="color:#ff9f43">「捨て」</b>マークの付いた牌をクリックしよう。'},
   {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
@@ -497,17 +497,18 @@ $('viewBtn').addEventListener('click', cycleView);
 
 // ===== 入力 =====
 const keys = {};
-const DIRS = {arrowleft: [0, -1], arrowright: [0, 1], arrowup: [1, 0], arrowdown: [-1, 0]};
+// WASD で移動（日本語入力ONでも効くよう e.code で判定）
+const DIRS = {keya: [0, -1], keyd: [0, 1], keyw: [1, 0], keys: [-1, 0]};
 window.addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
-  if ([' ', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k)) e.preventDefault();
+  const k = e.code.startsWith('Key') ? e.code.toLowerCase() : e.key.toLowerCase();
+  if ([' ', 'keyw', 'keya', 'keys', 'keyd'].includes(k)) e.preventDefault();
   if (!running) return;
   if (DIRS[k] && !keys[k]) { keys[k] = true; tryStep(DIRS[k]); G.stepCool = STEP_REPEAT * 1.8; return; }
   keys[k] = true;
   if (e.repeat) return;
   if (k === ' ') declareWin();
 });
-window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('keyup', e => { keys[e.code.startsWith('Key') ? e.code.toLowerCase() : e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 // d = [前後（＋でダルマ側）, 左右（＋で右）]
