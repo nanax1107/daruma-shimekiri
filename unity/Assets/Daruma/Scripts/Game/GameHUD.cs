@@ -1,13 +1,19 @@
 using UnityEngine;
 
-// 画面表示（タイトル・HUD・手牌・結果）。IMGUI で描くので、シーンに UI を置かなくてよい
+// 画面表示（タイトル・HUD・ミニマップ・手牌・結果）。IMGUI で描くので、シーンに UI を置かなくてよい
 public class GameHUD : MonoBehaviour
 {
-    public static bool PointerOverHand;
+    // マウスが画面の表示（ボタン・手牌・地図など）の上にあるか。上にあるときはドラッグで視点を動かさない
+    public static bool PointerOverUI;
 
     const float BaseH = 720f;
-    GUIStyle label, center, big, small, tileNum, tileSuit, button, modeTitle, modeDesc;
-    Rect handRect;
+    GUIStyle label, small, center, big, button, modeTitle, tagStyle;
+    static readonly Color Gold = new Color(1f, 0.83f, 0.42f);
+    static readonly Color DoraCol = new Color(0.88f, 0.66f, 0f);
+    static readonly Color WantCol = new Color(0.24f, 0.86f, 0.35f);
+    static readonly Color RecCol = new Color(1f, 0.62f, 0.26f);
+
+    Rect[] uiRects = new Rect[0];
 
     void InitStyles()
     {
@@ -15,15 +21,13 @@ public class GameHUD : MonoBehaviour
         // 画面の文字は Unity 標準フォントを使う（日本語は OS のフォントで自動的に表示される）
         label = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
         label.normal.textColor = Color.white;
-        small = new GUIStyle(label) { fontSize = 13 };
-        center = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = 16, fontStyle = FontStyle.Bold };
+        small = new GUIStyle(label) { fontSize = 12 };
+        center = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = 15, fontStyle = FontStyle.Bold };
         big = new GUIStyle(center) { fontSize = 40 };
-        tileNum = new GUIStyle(center) { fontSize = 22 };
-        tileSuit = new GUIStyle(center) { fontSize = 13 };
-        button = new GUIStyle(GUI.skin.button) { fontSize = 17, fontStyle = FontStyle.Bold, richText = true };
-        modeTitle = new GUIStyle(label) { fontSize = 18, fontStyle = FontStyle.Bold, wordWrap = false };
-        modeDesc = new GUIStyle(label) { fontSize = 13 };
-        modeDesc.normal.textColor = new Color(0.75f, 0.78f, 0.86f);
+        button = new GUIStyle(GUI.skin.button) { fontSize = 14, fontStyle = FontStyle.Bold, richText = true };
+        modeTitle = new GUIStyle(label) { fontSize = 17, fontStyle = FontStyle.Bold, wordWrap = false };
+        tagStyle = new GUIStyle(center) { fontSize = 11 };
+        tagStyle.normal.textColor = Color.black;
     }
 
     static void Fill(Rect r, Color c)
@@ -32,6 +36,18 @@ public class GameHUD : MonoBehaviour
         GUI.DrawTexture(r, Texture2D.whiteTexture);
         GUI.color = old;
     }
+    static void Border(Rect r, Color c, float w)
+    {
+        Fill(new Rect(r.x, r.y, r.width, w), c); Fill(new Rect(r.x, r.yMax - w, r.width, w), c);
+        Fill(new Rect(r.x, r.y, w, r.height), c); Fill(new Rect(r.xMax - w, r.y, w, r.height), c);
+    }
+    static void TileImg(Rect r, int t)
+    {
+        var tex = TileUtil.Tex(t);
+        if (tex != null) GUI.DrawTexture(r, tex, ScaleMode.StretchToFill);
+        else Fill(r, new Color(0.96f, 0.95f, 0.9f));
+    }
+    GUIStyle Colored(GUIStyle s, Color c) { var n = new GUIStyle(s); n.normal.textColor = c; return n; }
 
     void OnGUI()
     {
@@ -41,154 +57,242 @@ public class GameHUD : MonoBehaviour
         float scale = UnityEngine.Screen.height / BaseH;
         float W = UnityEngine.Screen.width / scale, H = BaseH;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
+        var rects = new System.Collections.Generic.List<Rect>();
 
-        if (g.Phase == DarumaGame.Screen.Title) { DrawTitle(g, W, H); PointerOverHand = true; return; }
-        DrawHud(g, W, H);
-        if (g.Phase == DarumaGame.Screen.Result) DrawResult(g, W, H);
+        if (g.Phase == DarumaGame.Screen.Title) { DrawTitle(g, W, H); rects.Add(new Rect(0, 0, W, H)); }
+        else
+        {
+            DrawHud(g, W, H, rects);
+            if (g.Phase == DarumaGame.Screen.Result) { DrawResult(g, W, H); rects.Add(new Rect(0, 0, W, H)); }
+        }
 
-        var mp = Event.current.mousePosition;
-        PointerOverHand = g.Phase != DarumaGame.Screen.Playing || handRect.Contains(mp);
+        if (Event.current.type == EventType.Repaint)
+        {
+            uiRects = rects.ToArray();
+            var mp = Event.current.mousePosition;
+            bool over = false;
+            foreach (var r in uiRects) if (r.Contains(mp)) { over = true; break; }
+            PointerOverUI = over;
+        }
     }
 
     // ===== タイトル（モード選択） =====
     void DrawTitle(DarumaGame g, float W, float H)
     {
-        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.025f, 0.05f, 0.82f));
-        float pw = 640, px = (W - pw) / 2, y = 40;
-        Fill(new Rect(px - 20, y - 16, pw + 40, H - 50), new Color(0.086f, 0.1f, 0.15f, 0.98f));
-        GUI.Label(new Rect(px, y, pw, 44), "<size=30><b>だるまさんが締め切った</b></size>", label); y += 50;
-        GUI.Label(new Rect(px, y, pw, 70),
-            "締め切り前夜の大学。欲しい牌の上に立って待とう。ダルマが振り向いた瞬間、足元の牌がツモになる。麻雀の役を作って倒そう。" +
-            "振り向いている間に動くと見つかって、後ろから<b>締め切りの壁</b>が迫ってくる。", label);
-        y += 80;
+        Fill(new Rect(0, 0, W, H), new Color(0.02f, 0.025f, 0.05f, 0.75f));
+        float pw = 640, px = (W - pw) / 2, ph = 420, y = (H - ph) / 2;
+        Fill(new Rect(px - 30, y - 24, pw + 60, ph + 40), new Color(0.086f, 0.1f, 0.15f, 0.98f));
+        GUI.Label(new Rect(px, y, pw, 44), "<size=30><b>だるまさんが締め切った</b></size>", label); y += 56;
+        GUI.Label(new Rect(px, y, pw, 56),
+            "<size=16>ダルマが<b>振り向いた瞬間</b>に立っていた牌が手に入る。\n牌をそろえてダルマを倒そう。<b>振り向き中に動く</b>と、締め切りの壁が迫る！</size>", label);
+        y += 70;
 
-        // チュートリアル（横長）＋3モード
         var modes = GameModes.Selectable;
-        DrawModeButton(g, modes[0], new Rect(px, y, pw, 70)); y += 80;
+        DrawModeButton(g, modes[0], new Rect(px, y, pw, 74)); y += 86;
         float bw = (pw - 20) / 3f;
         for (int i = 1; i < modes.Length; i++)
-            DrawModeButton(g, modes[i], new Rect(px + (i - 1) * (bw + 10), y, bw, 120));
-        y += 135;
-
-        GUI.Label(new Rect(px, y, pw, 24), "<b>操作</b>", label); y += 26;
-        string ops =
-            "<color=#ffd36b>WASD</color>　移動（振り向き中は止まる！）\n" +
-            "<color=#ffd36b>マウス / ← →</color>　視点移動　　<color=#ffd36b>E / 右クリック長押し</color>　ズーム\n" +
-            "<color=#ffd36b>牌の上で待つ</color>　ダルマが振り向いた時に足元の牌をツモ（捨て忘れはツモ切り）\n" +
-            "<color=#ffd36b>ホイール / Z・X</color>　捨てる牌を選ぶ　　<color=#ffd36b>左クリック / F</color>　捨てる\n" +
-            "<color=#ffd36b>Space</color>　上がり → ダルマに攻撃（翻数＝ダメージ）　　<color=#ffd36b>Q</color>　もういいや（配り直し）\n" +
-            "<color=#ffd36b>Esc</color>　マウスのロック解除（クリックで戻る）";
-        GUI.Label(new Rect(px, y, pw, 140), ops, small); y += 140;
-        GUI.Label(new Rect(px, y, pw, 60),
-            "役：ツモ1／タンヤオ1／七対子2／対々和2／清一色6。ドラ1枚につき＋1翻。上がりの形は4面子1雀頭か七対子。字牌はなし。上がると締め切りの壁が後退する。", modeDesc);
+            DrawModeButton(g, modes[i], new Rect(px + (i - 1) * (bw + 10), y, bw, 64));
+        y += 80;
+        GUI.Label(new Rect(px, y, pw, 24), "<color=#ffd36b><b>W A S D</b></color> 移動　／　<color=#ffd36b><b>ドラッグ</b></color> 見回す", label); y += 36;
+        GUI.Label(new Rect(px, y, pw, 20), "<color=#8890a8>牌の画像：FluffyStuff「riichi-mahjong-tiles」（パブリックドメイン CC0）</color>", small);
     }
 
     void DrawModeButton(DarumaGame g, GameMode m, Rect r)
     {
         if (GUI.Button(r, "", button)) g.StartMode(m);
         Fill(new Rect(r.x + 2, r.y + 2, r.width - 4, r.height - 4), new Color(0.12f, 0.14f, 0.21f));
-        GUI.Label(new Rect(r.x + 12, r.y + 8, r.width - 24, 26), m.Name, modeTitle);
-        var lv = new Rect(r.x + 12, r.y + 34, 90, 18);
+        if (m.Tutorial) Border(r, new Color(0.23f, 0.51f, 0.96f), 2);
+        GUI.Label(new Rect(r.x + 14, r.y + 8, r.width - 24, 26), m.Name, modeTitle);
+        var lv = new Rect(r.x + 14, r.y + 34, 92, 18);
         Fill(lv, m.LevelColor);
-        GUI.Label(lv, "<b>" + m.Level + "</b>", new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, fontSize = 11 });
-        GUI.Label(new Rect(r.x + 12, r.y + 54, r.width - 24, r.height - 58), m.Description, modeDesc);
+        GUI.Label(lv, "<b>" + m.Level + "</b>", Colored(tagStyle, Color.white));
+        if (!string.IsNullOrEmpty(m.Note)) GUI.Label(new Rect(r.x + 14, r.y + 52, r.width - 24, 20), "<color=#c0c6da>" + m.Note + "</color>", small);
     }
 
     // ===== プレイ中の表示 =====
-    void DrawHud(DarumaGame g, float W, float H)
+    void DrawHud(DarumaGame g, float W, float H, System.Collections.Generic.List<Rect> rects)
     {
         var m = g.Mode;
-        // 振り向き中の赤い縁
-        if (g.Phase == DarumaGame.Screen.Playing && g.State != DarumaGame.DState.Back)
+        bool looking = g.Phase == DarumaGame.Screen.Playing && g.State == DarumaGame.DState.Look;
+        float dist = g.Cx - g.WallX - 1;
+
+        // 画面のふち：振り向き中は赤、壁が近いと薄い赤
+        if (looking || dist < 1.5f)
         {
-            var edge = g.State == DarumaGame.DState.Look ? new Color(1, 0, 0, 0.35f) : new Color(1, 0.75f, 0, 0.25f);
-            Fill(new Rect(0, 0, W, 18), edge); Fill(new Rect(0, H - 18, W, 18), edge);
-            Fill(new Rect(0, 0, 18, H), edge); Fill(new Rect(W - 18, 0, 18, H), edge);
+            var edge = looking ? new Color(1, 0, 0, 0.35f) : new Color(1, 0.1f, 0.1f, 0.18f);
+            Fill(new Rect(0, 0, W, 16), edge); Fill(new Rect(0, H - 16, W, 16), edge);
+            Fill(new Rect(0, 0, 16, H), edge); Fill(new Rect(W - 16, 0, 16, H), edge);
         }
 
-        // HP バー
-        float bw = Mathf.Min(520, W * 0.6f), bx = (W - bw) / 2;
-        GUI.Label(new Rect(bx, 8, bw, 22), m.Name + "｜" + m.DarumaName + " HP " + g.Hp + " / " + m.Hp, center);
-        Fill(new Rect(bx, 32, bw, 14), new Color(0.16f, 0.07f, 0.08f));
-        Fill(new Rect(bx, 32, bw * g.Hp / Mathf.Max(1, m.Hp), 14), new Color(0.93f, 0.25f, 0.2f));
+        // 左上：時間
+        var timeR = new Rect(12, 10, 96, 30);
+        Fill(timeR, new Color(0, 0, 0, 0.55f));
+        GUI.Label(new Rect(22, 14, 90, 24), "時間 <color=#ffd36b><b>" + ((int)g.T / 60) + ":" + ((int)g.T % 60).ToString("00") + "</b></color>", label);
 
-        // 状態バー
-        string st; Color sc; float ratio;
-        if (g.State == DarumaGame.DState.Back) { st = m.DarumaName + "は背を向けている（動ける）"; sc = new Color(0.5f, 0.88f, 0.55f); ratio = 1 - g.StateT / Mathf.Max(0.01f, g.StateDur); }
-        else if (g.State == DarumaGame.DState.Warn) { st = "合図中…もうすぐ振り向く！"; sc = new Color(1f, 0.83f, 0.42f); ratio = 1 - g.StateT / m.Warn; }
-        else { st = "振り向き中！ 動くな　あと " + Mathf.Max(0, m.Look - g.StateT).ToString("0.0") + " 秒"; sc = new Color(1f, 0.42f, 0.42f); ratio = 1 - g.StateT / m.Look; }
-        var stStyle = new GUIStyle(center); stStyle.normal.textColor = sc;
-        GUI.Label(new Rect(bx, 52, bw, 22), st, stStyle);
-        Fill(new Rect(bx, 76, bw, 8), new Color(1, 1, 1, 0.15f));
-        Fill(new Rect(bx, 76, bw * Mathf.Clamp01(ratio), 8), sc);
-
-        // 左上の情報
-        float dist = Mathf.Max(0, g.Pz - g.WallS);
-        string foot = g.Cell >= 0 ? TileUtil.ColorTag(g.Stage.Tiles[g.Cell].Type, TileUtil.Name(g.Stage.Tiles[g.Cell].Type)) : "なし";
-        string info =
-            "時間 <color=#ffd36b>" + ((int)g.T / 60) + ":" + ((int)g.T % 60).ToString("00") + "</color>\n" +
-            "締め切りまで <color=" + (dist < 3 ? "#ff6b6b" : "#ffd36b") + ">" + dist.ToString("0.0") + " m</color>\n" +
-            "もういいや 残り <color=#ffd36b>" + g.MoiiyaLeft + "</color> 回\n" +
-            "見つかった回数 <color=#ffd36b>" + g.Found + "</color>\n" +
-            "ドラ " + TileUtil.ColorTag(g.Dora, TileUtil.Name(g.Dora)) + "（表示牌 " + TileUtil.Name(g.DoraInd) + "）\n" +
-            "足元の牌 " + foot;
-        Fill(new Rect(10, 10, 210, 136), new Color(0, 0, 0, 0.55f));
-        GUI.Label(new Rect(20, 16, 200, 130), info, small);
+        // 上：モード・HP・状態バー・通路の全体図
+        float bw = Mathf.Min(600, W * 0.48f), bx = (W - bw) / 2;
+        var topR = new Rect(bx - 14, 8, bw + 28, 112);
+        Fill(topR, new Color(0, 0, 0, 0.55f));
+        GUI.Label(new Rect(bx, 12, bw, 22), m.Name + "｜" + m.DarumaName + " HP " + g.Hp + " / " + m.Hp, center);
+        float ratio; Color sc;
+        if (looking)
+        {
+            sc = new Color(1f, 0.42f, 0.42f); ratio = 1 - g.StateT / m.Look;
+            GUI.Label(new Rect(bx, 36, bw, 22), "振り向き中！ 動くな　あと " + Mathf.Max(0, m.Look - g.StateT).ToString("0.0") + " 秒", Colored(center, sc));
+        }
+        else { sc = new Color(0.5f, 0.88f, 0.55f); ratio = 1 - g.StateT / Mathf.Max(0.01f, g.StateDur); }
+        Fill(new Rect(bx, 62, bw, 10), new Color(1, 1, 1, 0.15f));
+        Fill(new Rect(bx, 62, bw * Mathf.Clamp01(ratio), 10), sc);
+        // 通路（左端 = 壁の初期位置、右端 = ダルマ）
+        var trk = new Rect(bx, 82, bw, 24);
+        Fill(trk, new Color(0.1f, 0.12f, 0.2f));
+        float lo = DarumaGame.WallStart, hi = DarumaGame.Cols + 2;
+        System.Func<float, float> pct = x => Mathf.Clamp01((x - lo) / (hi - lo));
+        Fill(new Rect(trk.x, trk.y, trk.width * pct(g.WallX + 1), trk.height), new Color(0.7f, 0.06f, 0.1f));
+        GUI.Label(new Rect(trk.x + 4, trk.y + 2, 60, 20), "<b>締切</b>", small);
+        float mx = trk.x + trk.width * pct(g.Cx + 0.5f);
+        Fill(new Rect(mx - 9, trk.y + 3, 18, 18), new Color(0.23f, 0.51f, 0.96f));
+        GUI.Label(new Rect(mx - 9, trk.y + 3, 18, 18), "私", Colored(tagStyle, Color.white));
+        Fill(new Rect(trk.xMax - 18, trk.y + 5, 14, 14), looking ? Color.red : m.DarumaColor);
+        rects.Add(topR);
 
         // チュートリアル
-        if (m.Tutorial && g.Tut < DarumaGame.TutSteps.Length)
-        {
-            Fill(new Rect(10, 156, 300, 150), new Color(0.04f, 0.12f, 0.28f, 0.85f));
-            GUI.Label(new Rect(20, 162, 280, 20), "<color=#9cc3ff><b>チュートリアル " + (g.Tut + 1) + " / " + DarumaGame.TutSteps.Length + "</b></color>", small);
-            GUI.Label(new Rect(20, 182, 280, 120), DarumaGame.TutSteps[g.Tut].text, label);
-        }
+        if (g.TutActive) rects.Add(DrawTutorial(g));
+
+        // 右上：自分の周り9マスの地図
+        rects.Add(DrawMiniMap(g, W));
+
+        // 左下：操作
+        var keysR = new Rect(12, H - 210, 150, 46);
+        Fill(keysR, new Color(0, 0, 0, 0.55f));
+        GUI.Label(new Rect(20, H - 206, 140, 40), "<color=#ffd36b><b>W A S D</b></color> 移動\n<color=#ffd36b><b>ドラッグ</b></color> 見回す", small);
 
         // 中央のメッセージ
         string text = ""; Color col = Color.white;
         if (g.T < g.MsgUntil) { text = g.Msg; col = g.MsgColor; }
-        else if (g.Phase == DarumaGame.Screen.Playing && g.State == DarumaGame.DState.Warn) { text = m.WarnText; col = new Color(1f, 0.83f, 0.42f); }
-        else if (g.Phase == DarumaGame.Screen.Playing && g.State == DarumaGame.DState.Look) { text = m.LookText; col = new Color(1f, 0.35f, 0.35f); }
+        else if (looking) { text = m.LookText; col = new Color(1f, 0.35f, 0.35f); }
         if (text != "")
         {
-            var s2 = new GUIStyle(big); s2.normal.textColor = Color.black;
-            GUI.Label(new Rect(3, H * 0.55f + 3, W, 160), text, s2);
-            s2.normal.textColor = col;
-            GUI.Label(new Rect(0, H * 0.55f, W, 160), text, s2);
+            GUI.Label(new Rect(3, H * 0.36f + 3, W, 160), text, Colored(big, Color.black));
+            GUI.Label(new Rect(0, H * 0.36f, W, 160), text, Colored(big, col));
         }
 
-        // ヒント
-        string hint; Color hc = new Color(0, 0, 0, 0.6f);
-        if (g.Win != null) { hint = "上がれる！ Space で攻撃（" + g.Win.Han + "翻）"; hc = new Color(0.72f, 0.53f, 0.04f, 0.95f); }
-        else if (g.Drawn >= 0) hint = "1枚捨てる：ホイール/Z・Xで選んで 左クリック/F";
-        else hint = "欲しい牌の上に立とう。ダルマが振り向いた時の足元の牌をツモ";
-        var hr = new Rect((W - 520) / 2, H - 112, 520, 26);
-        Fill(hr, hc);
+        // 下：ヒント文
+        string hint;
+        if (g.Win != null) hint = "上がり！ 攻撃中（" + g.Win.Han + "翻）";
+        else if (g.Drawn >= 0) hint = "いらない牌を自動で捨てるよ";
+        else hint = g.HintsOn ? "緑に光る牌の上で、振り向きを待とう" : "欲しい牌の上に立って待とう。振り向いた瞬間の足元の牌がツモになる";
+        var hr = new Rect((W - 480) / 2, H - 156, 480, 26);
+        Fill(hr, g.Win != null ? new Color(0.72f, 0.53f, 0.04f, 0.95f) : new Color(0, 0, 0, 0.6f));
         GUI.Label(hr, hint, center);
 
-        // 手牌
-        float tw = 40, th = 56, gap = 4;
-        float total = 14 * tw + 13 * gap + 16;
-        float x0 = (W - total) / 2, y0 = H - 70;
-        handRect = new Rect(x0, y0 - 12, total, th + 14);
+        // 下：足元の牌・手牌・ボタン
+        var bar = new Rect(0, H - 124, W, 124);
+        Fill(bar, new Color(0.03f, 0.04f, 0.07f, 0.8f));
+        rects.Add(bar);
+        float tw = 48, th = 64, gap = 4;
+        float handW = 13 * (tw + gap) + 14 + tw;
+        float x0 = Mathf.Max(100, (W - handW) / 2 - 40), y0 = H - 84;
+
+        // 足元の牌
+        GUI.Label(new Rect(x0 - 86, y0 - 22, 70, 18), "<color=#ffd36b>足元の牌</color>", Colored(tagStyle, Gold));
+        var footR = new Rect(x0 - 76, y0, tw, th);
+        var under = g.UnderTile();
+        if (under != null) { TileImg(footR, under.Type); Border(footR, Gold, 2); }
+        else { Border(footR, new Color(0.7f, 0.6f, 0.3f, 0.6f), 1); GUI.Label(footR, "なし", Colored(tagStyle, new Color(0.8f, 0.75f, 0.6f))); }
+
         for (int i = 0; i < 14; i++)
         {
-            float x = x0 + i * (tw + gap) + (i == 13 ? 16 : 0);
-            bool sel = i == g.Sel;
-            var r = new Rect(x, y0 - (sel ? 10 : 0), tw, th);
+            float x = x0 + i * (tw + gap) + (i == 13 ? 14 : 0);
+            var r = new Rect(x, y0, tw, th);
             int t = i < 13 ? (i < g.Hand.Count ? g.Hand[i] : -1) : g.Drawn;
-            if (t < 0)
+            if (t < 0) { if (i == 13) Border(r, new Color(1, 1, 1, 0.3f), 1); continue; }
+            TileImg(r, t);
+            if (t == g.Dora) Border(r, DoraCol, 3);
+            if (i == 13) Border(r, Gold, 2);
+            if (i == g.RecIdx && g.Win == null)
             {
-                if (i == 13) { Fill(new Rect(r.x, r.y, r.width, 2), new Color(1, 1, 1, 0.4f)); Fill(new Rect(r.x, r.yMax - 2, r.width, 2), new Color(1, 1, 1, 0.4f)); }
-                continue;
+                Border(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), RecCol, 3);
+                var tr = new Rect(r.x + 4, r.y - 20, r.width - 8, 16);
+                Fill(tr, RecCol);
+                GUI.Label(tr, "<b>捨て</b>", tagStyle);
             }
-            if (sel) Fill(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), new Color(1f, 0.8f, 0.2f));
-            Fill(r, t == g.Dora ? new Color(1f, 0.95f, 0.75f) : new Color(0.96f, 0.95f, 0.9f));
-            var ns = new GUIStyle(tileNum); ns.normal.textColor = TileUtil.SuitColors[TileUtil.Suit(t)];
-            var ss = new GUIStyle(tileSuit); ss.normal.textColor = TileUtil.SuitColors[TileUtil.Suit(t)];
-            GUI.Label(new Rect(r.x, r.y + 4, r.width, 28), TileUtil.Num(t).ToString(), ns);
-            GUI.Label(new Rect(r.x, r.y + 30, r.width, 20), TileUtil.Suits[TileUtil.Suit(t)], ss);
-            if (!DarumaGame.Locked && g.Phase == DarumaGame.Screen.Playing && GUI.Button(r, "", GUIStyle.none)) g.ClickTile(i);
         }
+
+        // ボタン
+        float bx2 = Mathf.Min(W - 190, x0 + handW + 24), by = H - 112;
+        if (GUI.Button(new Rect(bx2, by, 176, 34), "もういいや（残り" + (g.MoiiyaLeft > 50 ? "∞" : g.MoiiyaLeft.ToString()) + "回）", button)) g.Moiiya();
+        if (m.Hints && GUI.Button(new Rect(bx2, by + 42, 176, 34), "ヒント：" + (g.HintsOn ? "ON" : "OFF"), button)) g.ToggleHints();
+    }
+
+    Rect DrawTutorial(DarumaGame g)
+    {
+        var st = DarumaGame.TutSteps[g.Tut];
+        float w = 340, x = 12, y = 50, h = 34;
+        // 高さを先に計算
+        float textH = label.CalcHeight(new GUIContent(st.Text), w - 28);
+        h += textH + 6;
+        if (st.Rows != null) h += st.Rows.Length * 38 + 4;
+        if (st.Note != null) h += 22;
+        if (st.Ev == "next") h += 40;
+        var box = new Rect(x, y, w, h);
+        Fill(box, new Color(0.04f, 0.12f, 0.28f, 0.92f));
+        Border(box, new Color(0.23f, 0.51f, 0.96f), 1);
+        float cy = y + 8;
+        GUI.Label(new Rect(x + 14, cy, w - 28, 20), "<color=#9cc3ff><b>チュートリアル " + (g.Tut + 1) + " / " + DarumaGame.TutSteps.Length +
+            (st.Title != null ? "　" + st.Title : "") + "</b></color>", small);
+        cy += 24;
+        GUI.Label(new Rect(x + 14, cy, w - 28, textH), st.Text, label); cy += textH + 6;
+        if (st.Rows != null)
+        {
+            for (int i = 0; i < st.Rows.Length; i++)
+            {
+                float tx = x + 14;
+                foreach (var t in st.Rows[i]) { TileImg(new Rect(tx, cy, 26, 34), t); tx += 28; }
+                GUI.Label(new Rect(x + 104, cy + 6, w - 118, 24), st.Captions[i], small);
+                cy += 38;
+            }
+            cy += 4;
+        }
+        if (st.Note != null) { GUI.Label(new Rect(x + 14, cy, w - 28, 20), "<color=#b8c8ec>" + st.Note + "</color>", small); cy += 22; }
+        if (st.Ev == "next" && GUI.Button(new Rect(x + w - 124, cy + 2, 110, 30), "次へ ▶", button)) g.TutEvent("next");
+        return box;
+    }
+
+    Rect DrawMiniMap(DarumaGame g, float W)
+    {
+        float cw = 52, ch = 68, pad = 6;
+        float mw = cw * 3 + pad * 2, mh = ch * 3 + pad * 2;
+        float x0 = W - mw - 12, y0 = 10;
+        var box = new Rect(x0, y0, mw, mh + 24);
+        Fill(box, new Color(0.03f, 0.04f, 0.07f, 0.8f));
+        for (int dc = 1; dc >= -1; dc--)
+        {
+            for (int dr = -1; dr <= 1; dr++)
+            {
+                int c = g.Cx + dc, r = g.Cy + dr;
+                var cell = new Rect(x0 + pad + (dr + 1) * cw + 2, y0 + pad + (1 - dc) * ch + 2, cw - 4, ch - 4);
+                var tile = g.Stage.TileAt(c, r);
+                if (c + 0.5f < g.WallX + 1) Fill(cell, new Color(0.55f, 0.05f, 0.08f));
+                else if (tile == null) Fill(cell, new Color(0.15f, 0.17f, 0.24f));
+                else
+                {
+                    TileImg(cell, tile.Type);
+                    if (tile.Type == g.Dora) Border(cell, DoraCol, 3);
+                    if (g.HintsOn && g.Useful.Contains(tile.Type)) Border(new Rect(cell.x + 1, cell.y + 1, cell.width - 2, cell.height - 2), WantCol, 4);
+                }
+                if (dc == 0 && dr == 0)
+                {
+                    Border(new Rect(cell.x - 2, cell.y - 2, cell.width + 4, cell.height + 4), Gold, 3);
+                    var lr = new Rect(cell.x + 6, cell.yMax - 16, cell.width - 12, 15);
+                    Fill(lr, Gold);
+                    GUI.Label(lr, "<b>足元</b>", tagStyle);
+                }
+            }
+        }
+        string legend = "<color=#ffd36b>■</color>足元　<color=#e0a800>■</color>ドラ" + (g.HintsOn ? "　<color=#3ddc5a>■</color>ほしい牌" : "");
+        GUI.Label(new Rect(x0, y0 + mh, mw, 22), legend, Colored(tagStyle, Color.white));
+        return box;
     }
 
     // ===== 結果 =====
@@ -198,7 +302,7 @@ public class GameHUD : MonoBehaviour
         float pw = 460, px = (W - pw) / 2, py = H / 2 - 130;
         Fill(new Rect(px, py, pw, 250), new Color(0.086f, 0.1f, 0.15f, 0.98f));
         string title, body;
-        if (g.Cleared && g.Mode.Tutorial) { title = "<color=#ffd36b>チュートリアル完了！</color>"; body = "基本の操作はこれでばっちり。\nモード選択から「学科分けモード」に挑戦しよう。"; }
+        if (g.Cleared && g.Mode.Tutorial) { title = "<color=#ffd36b>チュートリアル完了！</color>"; body = "これで遊び方はばっちり。\nモード選択から「学科分けモード」に挑戦しよう。"; }
         else if (g.Cleared) { title = "<color=#ffd36b>クリア！</color>"; body = g.Mode.Name + "：" + g.Mode.DarumaName + "を倒した。\nタイム " + ((int)g.T / 60) + ":" + ((int)g.T % 60).ToString("00") + "／見つかった回数 " + g.Found + " 回"; }
         else { title = "<color=#ff5a5a>締め切りアウト</color>"; body = "締め切りの壁に追いつかれた…（ダルマの残りHP " + g.Hp + "）"; }
         GUI.Label(new Rect(px, py + 20, pw, 50), "<size=34><b>" + title + "</b></size>", center);

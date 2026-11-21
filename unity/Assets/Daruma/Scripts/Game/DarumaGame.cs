@@ -1,24 +1,25 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// ゲーム全体の進行（GameManager）。プレイヤー・ダルマ・壁・手牌・チュートリアルのルールをまとめて持つ
+// ゲーム全体の進行（GameManager）。プレイヤー・ダルマ・壁・手牌・ヒント・チュートリアルのルールをまとめて持つ。
+// ブラウザ版（web-prototype/3d-top/index.html）と同じルール。
 public class DarumaGame : MonoBehaviour
 {
     public static DarumaGame I;
 
-    // ===== 共通パラメータ =====
-    public const int Cols = 6, Rows = 20;
-    public const float TileSize = 1.5f;
-    public const float MoveSpeed = 3.2f;
+    // ===== 盤面 =====
+    public const int Cols = 20, Rows = 6;     // Cols = 前後のマス数、Rows = 左右のマス数
+    public const float CX = 1.2f, CZ = 1.6f;  // 1マスの横幅・奥行き
     public const float Grace = 0.4f;          // 振り向き直後に判定しない時間
-    public const float WallStart = -6f;       // 壁の初期位置（床に沿った距離）
-    public const float Eye = 2.3f;            // 目の高さ
-    public float HalfW => Cols * TileSize / 2f;
-    public float FloorLen => Rows * TileSize;
+    public const float StepRepeat = 0.13f;    // キー押しっぱなしの連続移動の間隔
+    public const float WallStart = -3.5f;     // 壁の初期位置（マス）
+    public const float Eye = 1.9f;            // 目の高さ
+    public static float CellX(float r) => (r - (Rows - 1) / 2f) * CX;
+    public static float CellZ(float c) => (c + 0.5f) * CZ;
 
     // ===== 状態 =====
     public enum Screen { Title, Playing, Result }
-    public enum DState { Back, Warn, Look }
+    public enum DState { Back, Look }
 
     public Screen Phase = Screen.Title;
     public GameMode Mode = GameModes.Gakka;
@@ -27,12 +28,11 @@ public class DarumaGame : MonoBehaviour
     public int Hp;
     public List<int> Hand = new List<int>();
     public int Drawn = -1;                    // ツモった牌（-1 = なし）
-    public int Sel;
     public WinResult Win;
     public int MoiiyaLeft, Found;
     public int Dora, DoraInd;
-    public float WallS, Px, Pz, Yaw, Pitch;
-    public int Cell = -1;
+    public float WallX;                       // 壁の位置（マス）
+    public int Cx = -1, Cy = 2;               // 自分のマス（Cx = 前後、Cy = 左右）
     public DState State;
     public float StateT, StateDur;
     public float T;
@@ -42,8 +42,19 @@ public class DarumaGame : MonoBehaviour
     public bool Cleared;
     public int Tut;
 
-    bool foundThisLook, quickNext;
-    float shakeUntil, moved, turned, lastYaw;
+    // ヒント
+    public bool HintsOn;
+    public int RecIdx = -1;                   // 捨てるといい牌の位置
+    public HashSet<int> Useful = new HashSet<int>();
+
+    // 視点（マウスのドラッグで見回す）
+    public float LookYaw, LookPitch;
+
+    bool foundThisLook, quickNext, dragging;
+    float shakeUntil, stepCool, autoWinAt = -1, autoDiscardAt = -1, lastClick = -1;
+    int moved;
+    float dx = -1, dy = 2;                    // 描画用のなめらかな位置
+    Vector3 camPos;
     Vector3 darumaBase;
 
     void Awake()
@@ -51,7 +62,7 @@ public class DarumaGame : MonoBehaviour
         I = this;
         // シーンに置かれたステージを使う（なければその場で組み立てる）
         Stage = FindFirstObjectByType<Stage>();
-        if (Stage == null) Stage = Stage.Build(transform, Cols, Rows, TileSize);
+        if (Stage == null) Stage = Stage.Build(transform);
         Stage.InitRuntime();
         darumaBase = Stage.Daruma.position;
         if (GetComponent<GameHUD>() == null) gameObject.AddComponent<GameHUD>();
@@ -64,46 +75,43 @@ public class DarumaGame : MonoBehaviour
         Mode = m;
         Stage.ApplyMode(m);
         ResetGame();
+        HintsOn = m.Hints;
+        UpdateHints();
         Phase = Screen.Playing;
-        LockCursor(true);
     }
 
-    public void BackToTitle() { Phase = Screen.Title; LockCursor(false); }
+    public void BackToTitle() { Phase = Screen.Title; }
 
     void ResetGame()
     {
         Hp = Mode.Hp;
-        Hand = TileUtil.Deal13(); Drawn = -1; Sel = 0; Win = null;
+        Hand = TileUtil.Deal13(); Drawn = -1; Win = null;
         MoiiyaLeft = Mode.Moiiya; Found = 0;
-        WallS = WallStart;
-        Px = 0; Pz = -1.8f; Yaw = 0; Pitch = 0.12f;
-        Cell = -1;
+        WallX = WallStart;
+        Cx = -1; Cy = 2; dx = Cx; dy = Cy;
         State = DState.Back; StateT = 0; StateDur = 4; foundThisLook = false; quickNext = false;
         T = 0; Msg = ""; MsgUntil = 0; shakeUntil = 0;
-        Tut = 0; moved = 0; turned = 0; lastYaw = 0;
+        Tut = 0; moved = 0; stepCool = 0; autoWinAt = -1; autoDiscardAt = -1;
+        LookYaw = 0; LookPitch = 0;
         RollDora();
         foreach (var t in Stage.Tiles) { t.SetType(TileUtil.RandomTile()); t.FlashUntil = 0; }
         Stage.Daruma.rotation = Quaternion.Euler(0, 180, 0);
+        camPos = new Vector3(CellX(Cy), Eye, CellZ(Cx) - 0.35f);
+        UpdateHints();
     }
 
     void End(bool cleared)
     {
         Cleared = cleared;
         Phase = Screen.Result;
-        LockCursor(false);
     }
-
-    static void LockCursor(bool on)
-    {
-        Cursor.lockState = on ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible = !on;
-    }
-    public static bool Locked => Cursor.lockState == CursorLockMode.Locked;
 
     public void Flash(string text, Color color, float dur)
     {
         Msg = text; MsgColor = color; MsgUntil = T + dur;
     }
+
+    public FloorTile UnderTile() => Stage.TileAt(Cx, Cy);
 
     // ===== 手牌 =====
     public List<int> FullHand()
@@ -112,7 +120,6 @@ public class DarumaGame : MonoBehaviour
         if (Drawn >= 0) l.Add(Drawn);
         return l;
     }
-    public int MaxSel => Drawn >= 0 ? 13 : 12;
 
     void RollDora()
     {
@@ -122,7 +129,22 @@ public class DarumaGame : MonoBehaviour
 
     void CheckWin() { Win = Drawn >= 0 ? HandEvaluator.Evaluate(FullHand(), Dora) : null; }
 
-    void TsumoTile(int t) { Drawn = t; Sel = 13; CheckWin(); }
+    public void UpdateHints()
+    {
+        RecIdx = -1; Useful = new HashSet<int>();
+        if (Drawn >= 0)
+        {
+            // 捨てる牌の計算は自動で捨てるために常に行う
+            if (Win == null) RecIdx = Hints.BestDiscard(FullHand());
+        }
+        else if (HintsOn && Hand.Count == 13)
+        {
+            var u = Hints.Useful(Hand, out int s);
+            Useful = Hints.Narrow(Hand, s, u);
+        }
+    }
+
+    public void ToggleHints() { HintsOn = !HintsOn; UpdateHints(); }
 
     public void Discard(int i)
     {
@@ -135,104 +157,127 @@ public class DarumaGame : MonoBehaviour
             Hand.Sort();
             Drawn = -1;
         }
-        Sel = Mathf.Min(Sel, 12);
         Win = null;
+        UpdateHints();
         TutEvent("discard");
-    }
-
-    public void ClickTile(int i)
-    {
-        if (Sel == i) Discard(i);
-        else Sel = i;
     }
 
     void DeclareWin()
     {
-        if (Win == null) return;
+        if (Phase != Screen.Playing || Win == null) return;
         var r = Win;
         Hp = Mathf.Max(0, Hp - r.Han);
         shakeUntil = T + 0.6f;
-        float before = WallS;
-        WallS = Mathf.Max(WallStart, WallS - Mode.WallPushback);
-        float back = before - WallS;
+        float before = WallX;
+        WallX = Mathf.Max(WallStart, WallX - Mode.WallPushback);
+        float back = before - WallX;
         RollDora();
         Flash(r.YakuNames + "\n" + r.Han + "翻 ダメージ！" +
-              (back > 0.05f ? "\n締め切りが" + back.ToString("0.0") + "m後退！" : "") + "\nドラが変わった",
+              (back > 0.05f ? "\n締め切りが" + back.ToString("0.0") + "マス後退！" : "") + "\nドラが変わった",
               new Color(1f, 0.83f, 0.42f), 2.8f);
-        Hand = TileUtil.Deal13(); Drawn = -1; Sel = 0; Win = null;
+        Hand = TileUtil.Deal13(); Drawn = -1; Win = null; autoWinAt = -1;
+        UpdateHints();
         TutEvent("win");
         if (Hp <= 0) End(true);
     }
 
-    void Moiiya()
+    public void Moiiya()
     {
+        if (Phase != Screen.Playing) return;
         if (Drawn >= 0) { Flash("先に1枚捨ててから", Color.gray, 1.2f); return; }
         if (MoiiyaLeft <= 0) { Flash("もう使えない…", Color.gray, 1.2f); return; }
         MoiiyaLeft--;
-        Hand = TileUtil.Deal13(); Sel = 0;
-        WallS += Mode.WallPenalty;
-        Flash(Mode.WallPenalty > 0 ? "もういいや…\n締め切りが" + Mode.WallPenalty + "m迫る" : "もういいや…\n手牌を配り直した",
+        Hand = TileUtil.Deal13();
+        WallX += Mode.WallPenalty;
+        Flash(Mode.WallPenalty > 0 ? "もういいや…\n締め切りが" + Mode.WallPenalty + "マス迫る" : "もういいや…\n手牌を配り直した",
               new Color(1f, 0.54f, 0.54f), 1.8f);
+        UpdateHints();
         TutEvent("moiiya");
     }
 
     // ダルマが振り向いた瞬間に足元の牌をツモる
     void LookTsumo()
     {
-        if (Cell < 0) { Flash("牌の上にいない…\nツモなし", Color.gray, 1.4f); return; }
+        var tile = UnderTile();
+        if (tile == null) { Flash("牌の上にいない…\nツモなし", Color.gray, 1.4f); return; }
         string cut = "";
-        if (Drawn >= 0) { cut = "（捨てなかった牌はツモ切り）"; Drawn = -1; }
-        var tile = Stage.Tiles[Cell];
+        if (Drawn >= 0)
+        {
+            Discard(RecIdx >= 0 ? RecIdx : 13);
+            cut = "（「捨て」の牌を自動で捨てた）";
+        }
         int t = tile.Type;
-        TsumoTile(t);
+        Drawn = t; CheckWin();
         tile.SetType(TileUtil.RandomTile());
-        tile.FlashUntil = T + 0.6f;
+        tile.FlashUntil = T + 0.7f;
         Flash(TileUtil.Name(t) + " をツモ！" + (cut != "" ? "\n" + cut : ""), Color.white, 1.3f);
+        UpdateHints();
         TutEvent("tsumo");
+        // そろったら自動で攻撃。そろわなければ「捨て」の牌を少し見せてから自動で捨てる
+        if (Win != null) { Flash("そろった！ 上がり！", new Color(1f, 0.83f, 0.42f), 0.8f); autoWinAt = Time.time + 0.7f; }
+        else autoDiscardAt = Time.time + 0.9f;
     }
 
     void SwapFloor()
     {
         foreach (var t in Stage.Tiles)
-            if (Random.value < Mode.SwapRate) { t.SetType(TileUtil.RandomTile()); t.FlashUntil = T + 0.5f; }
+            if (Random.value < Mode.SwapRate) { t.SetType(TileUtil.RandomTile()); t.FlashUntil = T + 0.6f; }
     }
 
-    // ===== チュートリアル =====
-    public static readonly (string ev, string text, bool setup)[] TutSteps =
+    // ===== チュートリアル（麻雀を知らない人向け） =====
+    public class TutStep
     {
-        ("move", "WASD で歩いてみよう。", false),
-        ("turn", "マウス（または ← → キー）で、まわりを見渡してみよう。", false),
-        ("tsumo", "上の状態バーが緑の間は動ける。好きな牌の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌がツモになる。", false),
-        ("discard", "ツモできた！ 振り向き中は動かずに、ホイールか Z・X で捨てる牌を選び、左クリックか F で1枚捨てよう。", false),
-        ("safeLook", "振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。", false),
-        ("moiiya", "手が悪いときは Q で「もういいや」。手牌を全部配り直せる（本番は回数制限あり・壁が迫る）。押してみよう。", false),
-        ("win", "最後は上がりの練習。あと1枚で上がれる手を用意した。緑色に光っている 4萬 か 7萬 の上に立って振り向きを待ち、ツモったら Space で攻撃！", true),
+        public string Ev, Title, Text, Note;
+        public int[][] Rows;          // 牌の画像の行
+        public string[] Captions;     // 行の説明
+        public bool Setup;
+    }
+
+    public static readonly TutStep[] TutSteps =
+    {
+        new TutStep { Ev = "next", Title = "麻雀の牌", Text = "牌は 3種類 × 1〜9 の数字。",
+            Rows = new[] { new[] { 0, 4, 8 }, new[] { 9, 13, 17 }, new[] { 18, 22, 26 } },
+            Captions = new[] { "萬子（マンズ）：漢字の数字", "筒子（ピンズ）：丸の数", "索子（ソーズ）：棒の数" },
+            Note = "索子の「1」だけは鳥の絵。" },
+        new TutStep { Ev = "next", Title = "そろえる形", Text = "手牌は14枚。3枚1組を4つ ＋ 同じ牌2枚を1つ そろえたら「上がり」。",
+            Rows = new[] { new[] { 1, 2, 3 }, new[] { 13, 13, 13 }, new[] { 24, 24 } },
+            Captions = new[] { "同じ種類の連番（2・3・4萬）", "同じ牌3枚（5筒×3）", "同じ牌2枚（7索×2）" },
+            Note = "種類が違う牌は連番にならない（1萬・2筒・3索はダメ）。" },
+        new TutStep { Ev = "next", Title = "ヒント機能", Text =
+            "覚えなくても大丈夫。\n・床で緑に光る牌＝今ほしい牌。その上で待とう\n・いらない牌は自動で捨てる（「捨て」マークが付いた牌）\n・そろったら自動でダルマに攻撃",
+            Note = "緑に光るヒントは、チュートリアルと学科分けモードだけ。" },
+        new TutStep { Ev = "move", Text = "W A S D キーで、1マスずつ歩いてみよう（W=前・S=後ろ・A=左・D=右）。右上の地図の真ん中が「足元の牌」。" },
+        new TutStep { Ev = "tsumo", Text = "上のバーが緑の間は動ける。緑に光る牌の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌が手牌に入る（ツモ）。" },
+        new TutStep { Ev = "safeLook", Text = "振り向き中に動くと見つかって、ふだんは後ろの「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。" },
+        new TutStep { Ev = "moiiya", Text = "手が悪いときは右下の「もういいや」ボタン。手牌を全部配り直せる。押してみよう。" },
+        new TutStep { Ev = "win", Setup = true, Text = "最後は上がりの練習。あと1枚で上がれる手を用意した。緑に光る牌の上に立って振り向きを待とう。ツモると自動で攻撃！",
+            Note = "役（点数の種類）は覚えなくてOK。上がれば必ずダメージが入る。" },
     };
-    public static readonly int[] TutWin = { 3, 6 };
-    public bool TutSetupActive => Mode.Tutorial && Tut < TutSteps.Length && TutSteps[Tut].setup;
+    public static readonly int[] TutWin = { 0, 3, 6 };
+    public bool TutActive => Mode.Tutorial && Tut < TutSteps.Length;
+    public bool TutSetupActive => TutActive && TutSteps[Tut].Setup;
+    // 説明を読んでいる間（「次へ」のステップ）はダルマも壁も止めておく
+    public bool TutPaused => Phase == Screen.Playing && TutActive && TutSteps[Tut].Ev == "next";
 
     void TutSeed()
     {
-        int k = 0, pr = Mathf.Max(0, Mathf.FloorToInt(Pz / TileSize));
-        for (int i = 0; i < Stage.Tiles.Length; i++)
-        {
-            int r = i / Cols;
-            if (Mathf.Abs(r - pr) <= 1 && i != Cell) Stage.Tiles[i].SetType(TutWin[(k++) % 2]);
-        }
+        for (int c = Mathf.Max(0, Cx - 1); c <= Mathf.Min(Cols - 1, Cx + 2); c++)
+            for (int r = 0; r < Rows; r++)
+                if (!(c == Cx && r == Cy)) Stage.TileAt(c, r).SetType(TutWin[(c + r) % 3]);
     }
 
-    void TutEvent(string ev)
+    public void TutEvent(string ev)
     {
-        if (!Mode.Tutorial || Tut >= TutSteps.Length || TutSteps[Tut].ev != ev) return;
+        if (!TutActive || TutSteps[Tut].Ev != ev) return;
         Tut++;
-        if (Tut >= TutSteps.Length) return;
-        if (TutSteps[Tut].setup)
+        if (Tut < TutSteps.Length && TutSteps[Tut].Setup)
         {
-            Drawn = -1; Sel = 0;
-            Hand = new List<int> { 1, 2, 3, 4, 5, 10, 11, 12, 13, 13, 19, 20, 21 };   // 4萬・7萬待ち
+            Drawn = -1; Win = null; autoDiscardAt = -1;
+            Hand = new List<int> { 1, 2, 3, 4, 5, 10, 11, 12, 13, 13, 19, 20, 21 };   // 1萬・4萬・7萬待ち
+            UpdateHints();
             TutSeed();
         }
-        Flash("OK！", new Color(0.61f, 0.76f, 1f), 0.9f);
+        if (ev != "next") Flash("OK！", new Color(0.61f, 0.76f, 1f), 0.9f);
     }
 
     // ===== 毎フレーム =====
@@ -241,120 +286,99 @@ public class DarumaGame : MonoBehaviour
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
         if (Phase == Screen.Playing)
         {
-            T += dt;
-            HandleActions();
-            float speed = StepPlayer(dt);
-            moved += speed * dt;
-            turned += Mathf.Abs(Yaw - lastYaw); lastYaw = Yaw;
-            if (moved > 2) TutEvent("move");
-            if (turned > 0.8f) TutEvent("turn");
-            StepFloor();
-            StepDaruma(dt, speed);
-            WallS += Mode.WallSpeed * dt;
-            if (Pz - WallS <= 0.45f) End(false);
-        }
-        else
-        {
-            Yaw = Mathf.Sin(Time.time / 4f) * 0.15f;
+            bool paused = TutPaused;
+            if (!paused) T += dt;
+            HandleInput(dt);
+            if (!paused)
+            {
+                StepDaruma(dt);
+                WallX += Mode.WallSpeed * dt;
+            }
+            if (autoWinAt > 0 && Time.time >= autoWinAt) { autoWinAt = -1; if (Win != null) DeclareWin(); }
+            if (autoDiscardAt > 0 && Time.time >= autoDiscardAt)
+            {
+                autoDiscardAt = -1;
+                if (Drawn >= 0 && Win == null)
+                {
+                    int i = RecIdx >= 0 ? RecIdx : 13;
+                    string name = TileUtil.Name(FullHand()[i]);
+                    Discard(i);
+                    Flash(name + " を捨てた", new Color(1f, 0.7f, 0.42f), 1.0f);
+                }
+            }
+            if (Cx - WallX - 1 <= -0.3f) End(false);
         }
         UpdateVisuals(dt);
     }
 
-    void HandleActions()
+    static readonly (GKey key, int dc, int dr)[] Dirs =
     {
+        (GKey.W, 1, 0), (GKey.S, -1, 0), (GKey.A, 0, -1), (GKey.D, 0, 1),
+    };
+
+    void HandleInput(float dt)
+    {
+        // 移動：1回押すと1マス。押しっぱなしで連続移動
+        stepCool -= dt;
+        bool stepped = false;
+        foreach (var d in Dirs)
+            if (GameInput.Down(d.key)) { TryStep(d.dc, d.dr); stepCool = StepRepeat * 1.8f; stepped = true; break; }
+        if (!stepped && stepCool <= 0)
+            foreach (var d in Dirs)
+                if (GameInput.Held(d.key)) { TryStep(d.dc, d.dr); stepCool = StepRepeat; break; }
+
         if (GameInput.Down(GKey.Space)) DeclareWin();
-        if (GameInput.Down(GKey.Q)) Moiiya();
-        if (GameInput.Down(GKey.F) || GameInput.Down(GKey.Enter)) Discard(Sel);
-        if (GameInput.Down(GKey.Z)) Sel = Sel <= 0 ? MaxSel : Sel - 1;
-        if (GameInput.Down(GKey.X)) Sel = Sel >= MaxSel ? 0 : Sel + 1;
-        float sc = GameInput.Scroll();
-        if (sc != 0) Sel = Mathf.Clamp(Sel + (sc < 0 ? 1 : -1), 0, MaxSel);
-        if (GameInput.Down(GKey.Escape)) LockCursor(false);
-        if (GameInput.LeftDown())
+
+        // 視点：画面をドラッグで見回す（ダブルクリックで正面に戻る）
+        if (GameInput.LeftDown() && !GameHUD.PointerOverUI)
         {
-            if (Locked) Discard(Sel);
-            else if (!GameHUD.PointerOverHand) LockCursor(true);
+            dragging = true;
+            if (Time.unscaledTime - lastClick < 0.3f) { LookYaw = 0; LookPitch = 0; }
+            lastClick = Time.unscaledTime;
         }
-        if (Locked)
+        if (!GameInput.LeftHeld()) dragging = false;
+        if (dragging)
         {
-            var d = GameInput.MouseDelta();
-            Yaw += d.x * 0.0025f;
-            Pitch = Mathf.Clamp(Pitch - d.y * 0.0025f, -0.6f, 1.0f);
+            var m = GameInput.MouseDelta();
+            LookYaw = Mathf.Clamp(LookYaw + m.x * 0.003f, -1.7f, 1.7f);
+            LookPitch = Mathf.Clamp(LookPitch + m.y * 0.003f, -0.9f, 0.6f);
         }
     }
 
-    float StepPlayer(float dt)
+    // dc = 前後（＋でダルマ側）、dr = 左右（＋で右）
+    void TryStep(int dc, int dr)
     {
-        float f = 0, s = 0;
-        if (GameInput.Held(GKey.W)) f += 1;
-        if (GameInput.Held(GKey.S)) f -= 1;
-        if (GameInput.Held(GKey.D)) s += 1;
-        if (GameInput.Held(GKey.A)) s -= 1;
-        if (GameInput.Held(GKey.Left)) Yaw -= 2.2f * dt;
-        if (GameInput.Held(GKey.Right)) Yaw += 2.2f * dt;
-        float len = Mathf.Sqrt(f * f + s * s);
-        if (len < 0.001f) return 0;
-        float fx = Mathf.Sin(Yaw), fz = Mathf.Cos(Yaw);
-        float rx = Mathf.Cos(Yaw), rz = -Mathf.Sin(Yaw);
-        float ox = Px, oz = Pz;
-        Px += (fx * f + rx * s) / len * MoveSpeed * dt;
-        Pz += (fz * f + rz * s) / len * MoveSpeed * dt;
-        Px = Mathf.Clamp(Px, -HalfW + 0.25f, HalfW - 0.25f);
-        Pz = Mathf.Clamp(Pz, WallS + 0.2f, FloorLen - 0.3f);
-        return Mathf.Sqrt((Px - ox) * (Px - ox) + (Pz - oz) * (Pz - oz)) / dt;
-    }
-
-    void StepFloor()
-    {
-        int c = Mathf.FloorToInt((Px + HalfW) / TileSize), r = Mathf.FloorToInt(Pz / TileSize);
-        Cell = (c >= 0 && c < Cols && r >= 0 && r < Rows) ? r * Cols + c : -1;
+        int nx = Cx + dc, ny = Cy + dr;
+        if (ny < 0 || ny >= Rows || nx > Cols - 1) return;
+        if (nx - WallX - 1 < 0) return;                   // 壁の中には入れない
+        Cx = nx; Cy = ny; moved++;
+        if (moved >= 3) TutEvent("move");
+        if (State == DState.Look && StateT > Grace && !foundThisLook)
+        {
+            foundThisLook = true; Found++; WallX += Mode.WallPenalty;
+            Flash(Mode.WallPenalty > 0 ? "見つかった！\n締め切りが" + Mode.WallPenalty + "マス迫る" : "見つかった！\n（練習なので壁は動かない）",
+                  new Color(1f, 0.35f, 0.35f), 1.6f);
+        }
     }
 
     float NextBackDur() => Random.Range(Mode.BackMin, Mode.BackMax);
 
-    void StepDaruma(float dt, float speed)
+    void StepDaruma(float dt)
     {
         StateT += dt;
-        if (State == DState.Back && StateT >= StateDur && quickNext)
+        if (State == DState.Back && StateT >= StateDur)
         {
-            // 振り向き直し：合図なしでいきなり振り向く
-            quickNext = false;
+            // 「もうすぐ振り向く」の合図はなし。いきなり振り向く
+            if (quickNext) { quickNext = false; Flash("……と思ったら、もう一回！", new Color(1f, 0.54f, 0.54f), 1.3f); }
+            else if (TutSetupActive) TutSeed();
             State = DState.Look; StateT = 0; foundThisLook = false;
-            Flash("……と思ったら、もう一回！", new Color(1f, 0.54f, 0.54f), 1.3f);
             LookTsumo(); SwapFloor();
         }
-        else if (State == DState.Back && StateT >= StateDur)
+        else if (State == DState.Look && StateT >= Mode.Look)
         {
-            State = DState.Warn; StateT = 0;
-            if (TutSetupActive) TutSeed();
-        }
-        else if (State == DState.Warn && StateT >= Mode.Warn && Mode.Feint > 0 && Random.value < Mode.Feint)
-        {
-            // フェイント：振り向くふりをしてやめる
             State = DState.Back; StateT = 0; StateDur = NextBackDur();
-            shakeUntil = T + 0.4f;
-            Flash("……やっぱりいいや", new Color(0.79f, 0.71f, 1f), 1.3f);
-        }
-        else if (State == DState.Warn && StateT >= Mode.Warn)
-        {
-            State = DState.Look; StateT = 0; foundThisLook = false;
-            LookTsumo(); SwapFloor();
-        }
-        else if (State == DState.Look)
-        {
-            if (!foundThisLook && StateT > Grace && speed > Mode.DetectSpeed)
-            {
-                foundThisLook = true; Found++;
-                WallS += Mode.WallPenalty;
-                Flash(Mode.WallPenalty > 0 ? "見つかった！\n締め切りが" + Mode.WallPenalty + "m迫る" : "見つかった！\n（練習なので壁は動かない）",
-                      new Color(1f, 0.35f, 0.35f), 1.6f);
-            }
-            if (StateT >= Mode.Look)
-            {
-                State = DState.Back; StateT = 0; StateDur = NextBackDur();
-                if (Mode.Quick > 0 && Random.value < Mode.Quick) { quickNext = true; StateDur = 1.0f; }
-                if (!foundThisLook) TutEvent("safeLook");
-            }
+            if (Mode.Quick > 0 && Random.value < Mode.Quick) { quickNext = true; StateDur = 1.0f; }
+            if (!foundThisLook) TutEvent("safeLook");
         }
     }
 
@@ -362,49 +386,53 @@ public class DarumaGame : MonoBehaviour
     void UpdateVisuals(float dt)
     {
         bool playing = Phase == Screen.Playing;
-        bool looking = playing && State == DState.Look, warning = playing && State == DState.Warn;
+        bool looking = playing && State == DState.Look;
 
         // ダルマの向き・揺れ・光る目
         var d = Stage.Daruma;
         float targetY = looking ? 0f : 180f;
-        float curY = d.eulerAngles.y;
-        d.rotation = Quaternion.Euler(0, Mathf.LerpAngle(curY, targetY, Mathf.Min(1, dt * 5)), 0);
+        d.rotation = Quaternion.Euler(0, Mathf.LerpAngle(d.eulerAngles.y, targetY, Mathf.Min(1, dt * 5)), 0);
         float shake = T < shakeUntil ? Mathf.Sin(T * 60) * 0.25f : 0;
         d.position = darumaBase + new Vector3(shake, 0, 0);
         foreach (var e in Stage.GlowEyes) e.SetActive(looking);
         float glareTarget = looking ? 25f + Mathf.Sin(Time.time * 11) * 4f : 0f;
         Stage.Glare.intensity = Mathf.Lerp(Stage.Glare.intensity, glareTarget, 0.15f);
 
-        // 振り向き中は空気が赤く、合図中は黄色っぽく
-        var fogTarget = looking ? Stage.FogLook : warning ? Stage.FogWarn : Stage.FogNormal;
+        // 振り向き中は空気が赤く
+        var fogTarget = looking ? Stage.FogLook : Stage.FogNormal;
         RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, fogTarget, 0.08f);
         Stage.Cam.backgroundColor = RenderSettings.fogColor;
 
-        // 床の牌：遠いほどこちらに起き上がる＋色の強調
-        for (int i = 0; i < Stage.Tiles.Length; i++)
+        // 床の牌の色：ツモった跡・ほしい牌（緑）・ドラ
+        foreach (var t in Stage.Tiles)
         {
-            var t = Stage.Tiles[i];
-            float dist = t.S - Pz;
-            float tilt = Mathf.Clamp01((dist - 5f) / 16f) * 0.6f;
-            t.transform.localRotation = Quaternion.Euler(-tilt * Mathf.Rad2Deg, 0, 0);
-            t.transform.localPosition = new Vector3(t.X, 0.06f + Mathf.Sin(tilt) * TileSize * 0.47f, t.S);
-            Color tint = new Color(0.96f, 0.95f, 0.9f);
-            if (t.FlashUntil > T) tint = new Color(1f, 0.78f, 0.35f);
-            else if (playing && i == Cell) tint = new Color(0.7f, 0.82f, 1f);
-            else if (TutSetupActive && System.Array.IndexOf(TutWin, t.Type) >= 0) tint = new Color(0.55f, 1f, 0.55f);
-            else if (t.Type == Dora) tint = new Color(1f, 0.9f, 0.55f);
+            Color tint = Color.white;
+            if (t.FlashUntil > T) tint = new Color(1f, 0.78f, 0.45f);
+            else if (playing && ((TutSetupActive && System.Array.IndexOf(TutWin, t.Type) >= 0) || (HintsOn && Useful.Contains(t.Type))))
+                tint = new Color(0.55f, 1f, 0.55f);
+            else if (playing && t.Type == Dora) tint = new Color(1f, 0.92f, 0.6f);
             t.SetTint(tint);
         }
 
-        // 締め切りの壁
-        Stage.Wall.position = new Vector3(0, Stage.WorldY(WallS) + 3, Stage.WorldZ(WallS));
-        Stage.Wall.rotation = Quaternion.Euler(WallS > 0 ? -Stage.Th * Mathf.Rad2Deg : 0, 0, 0);
+        // 自分の位置（なめらかに動かす）と足元の枠
+        dx = Mathf.Lerp(dx, Cx, Mathf.Min(1, dt * 14));
+        dy = Mathf.Lerp(dy, Cy, Mathf.Min(1, dt * 14));
+        Stage.FootFrame.position = new Vector3(CellX(Cy), 0, CellZ(Cx));
+        Stage.FootFrame.gameObject.SetActive(playing && UnderTile() != null);
 
-        // カメラ
+        // 締め切りの壁（前面 = 壁の位置 + 1マス）
+        float frontZ = (WallX + 1) * CZ;
+        Stage.Wall.position = new Vector3(0, 1.2f, frontZ - Stage.WallDepth / 2);
+        float dist = Cx - WallX - 1;
+        Stage.SetEdgeColor(dist < 2 && Mathf.Sin(Time.time * 14) > 0 ? Color.white : new Color(1f, 0.25f, 0.25f));
+
+        // カメラ：一人称。少し下を向いて足元の近くも見える。ドラッグで見回せる
         var cam = Stage.Cam;
-        cam.transform.position = new Vector3(Px, Stage.WorldY(Pz) + Eye, Stage.WorldZ(Pz));
-        cam.transform.rotation = Quaternion.Euler(Pitch * Mathf.Rad2Deg, Yaw * Mathf.Rad2Deg, 0);
-        bool zoom = playing && (GameInput.Held(GKey.E) || GameInput.RightHeld());
-        cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, zoom ? 34f : 70f, 0.18f);
+        var target = new Vector3(CellX(dy), Eye, CellZ(dx) - 0.35f);
+        camPos = Vector3.Lerp(camPos, target, 0.25f);
+        if (!playing) camPos = target;
+        cam.transform.position = camPos;
+        float yaw = playing ? LookYaw : Mathf.Sin(Time.time / 4f) * 0.15f;
+        cam.transform.rotation = Quaternion.Euler((0.21f - LookPitch) * Mathf.Rad2Deg, yaw * Mathf.Rad2Deg, 0);
     }
 }

@@ -38,7 +38,9 @@ public static class DarumaSceneSetup
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode) return;
         if (EditorSceneManager.GetActiveScene().path != ScenePath) return;
-        if (Object.FindFirstObjectByType<Stage>() == null) RebuildStage();
+        var st = Object.FindFirstObjectByType<Stage>();
+        // ステージがない、または古い作り方のステージなら作り直す
+        if (st == null || st.BuildVersion < Stage.CurrentVersion) RebuildStage();
     }
 
     [MenuItem("だるま/ゲームシーンを作り直す")]
@@ -49,7 +51,7 @@ public static class DarumaSceneSetup
         var game = new GameObject("DarumaGame");
         game.AddComponent<DarumaGame>();
         game.AddComponent<GameHUD>();
-        Stage.Build(game.transform, DarumaGame.Cols, DarumaGame.Rows, DarumaGame.TileSize);
+        Stage.Build(game.transform);
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
 
@@ -71,7 +73,7 @@ public static class DarumaSceneSetup
             game.gameObject.AddComponent<GameHUD>();
         }
         foreach (var old in Object.FindObjectsByType<Stage>(FindObjectsSortMode.None)) Object.DestroyImmediate(old.gameObject);
-        Stage.Build(game.transform, DarumaGame.Cols, DarumaGame.Rows, DarumaGame.TileSize);
+        Stage.Build(game.transform);
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
         EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
         AssetDatabase.SaveAssets();

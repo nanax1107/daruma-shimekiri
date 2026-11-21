@@ -1,39 +1,35 @@
 using UnityEngine;
 
-// 床の牌1枚。位置（行・列）はシーンに置かれた場所から読み取る
+// 床の牌1枚。上の面（Top）に本物の牌の画像を貼る
+[ExecuteAlways]
 public class FloorTile : MonoBehaviour
 {
-    public Renderer Body;
-    public TextMesh NumText, SuitText;
+    public Renderer Top;
+    public int Col, Row;      // Col = 前後（ダルマ側が大きい）、Row = 左右
+    public int Type;
 
-    [System.NonSerialized] public int Type;
     [System.NonSerialized] public float FlashUntil;
-    [System.NonSerialized] public float S, X;   // 床に沿った距離・横位置
 
-    Material mat;
+    MaterialPropertyBlock mpb;
     Color lastTint = Color.clear;
+    int lastType = -1;
 
-    public void InitRuntime()
-    {
-        S = transform.localPosition.z;
-        X = transform.localPosition.x;
-        mat = Body.material;   // ゲーム中だけの複製
-    }
+    void OnEnable() { lastType = -1; Apply(Color.white); }
 
-    public void SetType(int t)
-    {
-        Type = t;
-        var c = TileUtil.SuitColors[TileUtil.Suit(t)];
-        NumText.text = TileUtil.Num(t).ToString();
-        SuitText.text = TileUtil.Suits[TileUtil.Suit(t)];
-        NumText.color = c;
-        SuitText.color = c;
-    }
+    public void SetType(int t) { Type = t; Apply(lastTint == Color.clear ? Color.white : lastTint); }
 
-    public void SetTint(Color c)
+    public void SetTint(Color c) { Apply(c); }
+
+    void Apply(Color tint)
     {
-        if (mat == null || c == lastTint) return;
-        lastTint = c;
-        Mat.SetColor(mat, c);
+        if (Top == null) return;
+        if (Type == lastType && tint == lastTint) return;
+        if (mpb == null) mpb = new MaterialPropertyBlock();
+        Top.GetPropertyBlock(mpb);
+        var tex = TileUtil.Tex(Type);
+        if (tex != null) { mpb.SetTexture("_BaseMap", tex); mpb.SetTexture("_MainTex", tex); }
+        mpb.SetColor("_BaseColor", tint); mpb.SetColor("_Color", tint);
+        Top.SetPropertyBlock(mpb);
+        lastType = Type; lastTint = tint;
     }
 }
