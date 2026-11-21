@@ -119,7 +119,7 @@
         <small>ボスダルマ。振り向き5秒・壁がとても速い・HP6・振り向き直しあり。</small></button>
     </div>
     <table>
-      <tr><td>矢印キー / WASD</td><td>1マスずつ移動（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
+      <tr><td>矢印キー</td><td>1マスずつ移動（押しっぱなしで連続移動）。振り向き中は動かない！</td></tr>
       <tr><td>牌の上で待つ</td><td>ダルマが振り向いた瞬間、足元の牌をツモ（捨て忘れはツモ切り）</td></tr>
       <tr><td>牌をクリック / Z・X</td><td>捨てる牌を選ぶ（選んだ牌をもう一度クリックで捨てる）</td></tr>
       <tr><td>F / Enter</td><td>選んだ牌を捨てる</td></tr>
@@ -199,16 +199,16 @@ function evaluate(tiles, dora) {
 const MODES = {
   tut:   {name: 'チュートリアル', daruma: '練習ダルマ', face: '練習', color: '#e07b00', tutorial: true,
           warnText: 'だるまさんが…', lookText: '振り向いたよ！ 止まって！',
-          hp: 1, moiiya: 99, backMin: 4, backMax: 6, warn: 2.5, look: 8, wallSpeed: 0, wallPenalty: 0, wallPushback: 0, swapRate: 0.3, feint: 0, quick: 0},
+          hp: 1, moiiya: 99, backMin: 7, backMax: 10, warn: 2.5, look: 8, wallSpeed: 0, wallPenalty: 0, wallPushback: 0, swapRate: 0.3, feint: 0, quick: 0},
   gakka: {name: '学科分けモード', daruma: 'GPAダルマ', face: 'GPA', color: '#c8202a',
           warnText: '成績…どう…', lookText: 'GPA足りてる？',
-          hp: 3, moiiya: 3, backMin: 3, backMax: 6, warn: 2, look: 8, wallSpeed: 0.035, wallPenalty: 1.5, wallPushback: 3, swapRate: 0.3, feint: 0, quick: 0},
+          hp: 3, moiiya: 3, backMin: 6, backMax: 10, warn: 2, look: 8, wallSpeed: 0.035, wallPenalty: 1.5, wallPushback: 3, swapRate: 0.3, feint: 0, quick: 0},
   zemi:  {name: 'ゼミ分けモード', daruma: '教授ダルマ', face: '教授', color: '#6b2fb3',
           warnText: '志望理由…は…', lookText: '志望理由を言ってみて！',
-          hp: 5, moiiya: 2, backMin: 2.5, backMax: 5, warn: 1.5, look: 6, wallSpeed: 0.055, wallPenalty: 2, wallPushback: 2.5, swapRate: 0.4, feint: 0.25, quick: 0},
+          hp: 5, moiiya: 2, backMin: 5, backMax: 8, warn: 1.5, look: 6, wallSpeed: 0.055, wallPenalty: 2, wallPushback: 2.5, swapRate: 0.4, feint: 0.25, quick: 0},
   lab:   {name: '研究室分けモード', daruma: 'ボスダルマ', face: 'ボス', color: '#2a2a30',
           warnText: '進捗…どう…', lookText: '進捗どうですか！',
-          hp: 6, moiiya: 1, backMin: 2, backMax: 4, warn: 1.2, look: 5, wallSpeed: 0.075, wallPenalty: 2, wallPushback: 2, swapRate: 0.5, feint: 0.3, quick: 0.25},
+          hp: 6, moiiya: 1, backMin: 4, backMax: 7, warn: 1.2, look: 5, wallSpeed: 0.075, wallPenalty: 2, wallPushback: 2, swapRate: 0.5, feint: 0.3, quick: 0.25},
 };
 let M = MODES.gakka;
 
@@ -287,7 +287,7 @@ function swapFloor() {
 
 // ===== チュートリアル =====
 const TUT = [
-  {ev: 'move', text: '矢印キーか WASD で、1マスずつ歩いてみよう。黄色い枠が「足元の牌」。左下にも大きく出る。'},
+  {ev: 'move', text: '矢印キーで、1マスずつ歩いてみよう。黄色い枠が「足元の牌」。左下にも大きく出る。'},
   {ev: 'tsumo', text: '上のバーが緑の間は動ける。欲しい牌の上に立って、ダルマが振り向くのを待とう。振り向いた瞬間、足元の牌がツモになる。'},
   {ev: 'discard', text: 'ツモできた！ 振り向き中は動かずに、手牌をクリックして選び、もう一度クリック（または F）で1枚捨てよう。'},
   {ev: 'safeLook', text: '振り向き中に動くと見つかって、ふだんは左の「締切」の壁が迫ってくる。次の振り向きの間、最後まで止まっていよう。'},
@@ -359,7 +359,7 @@ $('viewBtn').addEventListener('click', cycleView);
 
 // ===== 入力 =====
 const keys = {};
-const DIRS = {arrowleft: [0, -1], a: [0, -1], arrowright: [0, 1], d: [0, 1], arrowup: [1, 0], w: [1, 0], arrowdown: [-1, 0], s: [-1, 0]};
+const DIRS = {arrowleft: [0, -1], arrowright: [0, 1], arrowup: [1, 0], arrowdown: [-1, 0]};
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if ([' ', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k)) e.preventDefault();
@@ -572,9 +572,7 @@ function updateDom() {
   $('trackDaruma').style.background = G.state === 'look' ? '#ff2020' : M.color;
 
   const dist = Math.max(0, G.cx - G.wallX - 1), t = Math.floor(G.time);
-  $('info').innerHTML = '時間 <b>' + Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + '</b><br>' +
-    '締め切りまで <b class="' + (dist < 2 ? 'danger' : '') + '">' + dist.toFixed(1) + ' マス</b><br>' +
-    '見つかった回数 <b>' + G.found + '</b><br>ドラ<img src="' + TILE_SRC[G.dora] + '">';
+  $('info').innerHTML = '時間 <b>' + Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + '</b>';
 
   let text = '', col = '#fff';
   if (G.time < G.msgUntil) { text = G.msg; col = G.msgColor; }
